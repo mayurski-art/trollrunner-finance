@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Troll Runner Finance</title>
+
+  <style>
+    :root {
+      --bg: #050806;
+      --panel: #0b140d;
+      --panel-soft: #101c13;
+      --line: rgba(126, 255, 142, 0.3);
+      --text: #d8ffe0;
+      --muted: #86bf93;
+      --accent: #7eff8e;
+      --accent-soft: rgba(126, 255, 142, 0.15);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 20% 10%, rgba(126, 255, 142, 0.12), transparent 40%),
+        radial-gradient(circle at 80% 0%, rgba(94, 176, 255, 0.08), transparent 35%),
+        linear-gradient(180deg, #070b08, #030503 55%);
+    }
+
+    .scanlines::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(126, 255, 142, 0.025) 0px,
+        rgba(126, 255, 142, 0.025) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+    }
+
+    .wrap {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 26px 18px 56px;
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(126, 255, 142, 0.06), rgba(126, 255, 142, 0.02));
+    }
+
+    .brand {
+      letter-spacing: 0.04em;
+      font-weight: 700;
+    }
+
+    .pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 12px;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 12px;
+      background: var(--panel-soft);
+    }
+
+    .pill:hover {
+      background: var(--accent-soft);
+    }
+
+    .hero {
+      margin-top: 20px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 22px;
+      background: linear-gradient(180deg, rgba(18, 29, 21, 0.8), rgba(7, 11, 8, 0.9));
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 32px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .sub {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .stat {
+      padding: 14px;
+      border-radius: 10px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+
+    .label {
+      color: var(--muted);
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.07em;
+    }
+
+    .value {
+      margin-top: 8px;
+      font-size: 26px;
+      color: var(--accent);
+    }
+
+    .terminal {
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 10px;
+      background: #030603;
+      border: 1px solid var(--line);
+      font-size: 13px;
+      color: var(--muted);
+      white-space: pre-wrap;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      text-transform: uppercase;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .donation {
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(126, 255, 142, 0.08), rgba(126, 255, 142, 0.03));
+      border: 1px solid var(--line);
+    }
+
+    .wallet {
+      margin-top: 10px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #030603;
+      border: 1px dashed var(--line);
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 860px) {
+      .stats, .grid {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+    }
+  </style>
+</head>
+
+<body class="scanlines">
+  <div class="wrap">
+    <div class="top">
+      <strong class="brand">💰 TROLLRUNNER.FINANCE</strong>
+
+      <nav class="pills">
+        <a class="pill" href="https://blog.trollrunner.net">Blog</a>
+        <a class="pill" href="https://nutrition.trollrunner.net">Nutrition</a>
+        <a class="pill" href="https://trollrunner.net">Main Site</a>
+      </nav>
+    </div>
+
+    <section class="hero">
+      <h1>Treasury Console</h1>
+      <p class="sub">Tactical terminal-style dashboard</p>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="label">Total Value</div>
+          <div class="value">$124,500</div>
+        </div>
+
+        <div class="stat">
+          <div class="label">Runway</div>
+          <div class="value">18.4 mo</div>
+        </div>
+
+        <div class="stat">
+          <div class="label">Status</div>
+          <div class="value">ONLINE</div>
+        </div>
+      </div>
+
+      <div class="terminal">
+&gt; BUDGET SYNC COMPLETE
+&gt; CAMPAIGN COST UPDATED
+&gt; FORECAST WITHIN RANGE
+finance@trollrunner:~$
+      </div>
+
+      <div class="donation">
+        <h2>Troll Fund Wallet</h2>
+        <p>$6.9 = 1 mile</p>
+        <div class="wallet">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h3>Budget</h3>
+          <p>Track spending</p>
+        </div>
+
+        <div class="card">
+          <h3>Costs</h3>
+          <p>Campaign logistics</p>
+        </div>
+
+        <div class="card">
+          <h3>Growth</h3>
+          <p>Future scaling</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
