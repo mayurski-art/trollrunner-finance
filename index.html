@@ -213,7 +213,7 @@ h1 {
 
     <section class="hero">
       <h1>Treasury Console</h1>
-      <p class="sub">Inspired by trollstrategy.com with a tactical terminal-style dashboard look.</p>
+      <p class="sub" id="market-line">Loading market data...</p>
 
       <div class="stats">
         <article class="stat">
@@ -221,7 +221,7 @@ h1 {
           <div id="troll-balance" class="value">Loading...</div>
         </article>
         <article class="stat">
-          <div class="label">Wallet USD Value</div>
+          <div class="label">USD Value</div>
           <div id="troll-usd" class="value">Loading...</div>
         </article>
         <article class="stat">
@@ -232,7 +232,6 @@ h1 {
 
             <section class="donation" aria-label="Troll Fund wallet">
         <h2>Troll Fund Wallet</h2>
-        <p>Donations sent to this wallet power the mission. Conversion rate: <strong>$6.9 = 1 mile</strong>.</p>
         <div class="wallet">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</div>
       </section>
 
@@ -245,6 +244,7 @@ h1 {
   </div>
   <script>
     const TROLL_WALLET = "79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA";
+    const TROLL_MINT = "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2";
 
     function fmtNumber(value) {
       return Number(value || 0).toLocaleString(undefined, {
@@ -253,45 +253,92 @@ h1 {
       });
     }
 
+    async function getPricesFromDexScreener() {
+      const trollRes = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${TROLL_MINT}`);
+      if (!trollRes.ok) throw new Error(`DexScreener API error (${trollRes.status})`);
+      const trollJson = await trollRes.json();
+      const trollPair = (trollJson?.pairs || []).find((pair) => pair?.chainId === "solana");
+      const trollUsd = Number(trollPair?.priceUsd || 0);
+      const priceNative = Number(trollPair?.priceNative || 0);
+      const solUsd = priceNative > 0 ? trollUsd / priceNative : 0;
+
+      if (!trollUsd || !solUsd) throw new Error("DexScreener missing price data");
+      return { trollUsd, solUsd, source: "DexScreener" };
+    }
+
+    async function getPricesFromCoinGecko() {
+      const [solRes, trollRes] = await Promise.all([
+        fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"),
+        fetch(`https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${TROLL_MINT}&vs_currencies=usd`),
+      ]);
+      if (!solRes.ok || !trollRes.ok) {
+        throw new Error(`CoinGecko API error (${solRes.status}/${trollRes.status})`);
+      }
+      const [solJson, trollJson] = await Promise.all([solRes.json(), trollRes.json()]);
+      const solUsd = Number(solJson?.solana?.usd || 0);
+      const trollUsd = Number(trollJson?.[TROLL_MINT.toLowerCase()]?.usd || 0);
+      if (!trollUsd || !solUsd) throw new Error("CoinGecko missing price data");
+      return { trollUsd, solUsd, source: "CoinGecko" };
+    }
+
+    async function getPrices() {
+      try {
+        return await getPricesFromDexScreener();
+      } catch (dexErr) {
+        console.warn("DexScreener pricing failed, falling back to CoinGecko", dexErr);
+        try {
+          return await getPricesFromCoinGecko();
+        } catch (cgErr) {
+          console.warn("CoinGecko pricing also failed", cgErr);
+          return { trollUsd: 0, solUsd: 0, source: "Unavailable" };
+        }
+      }
+    }
+
+    async function getTrollBalance() {
+      const res = await fetch("https://api.mainnet-beta.solana.com", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "getTokenAccountsByOwner",
+          params: [
+            TROLL_WALLET,
+            { mint: TROLL_MINT },
+            { encoding: "jsonParsed" }
+          ]
+        }),
+      });
+      if (!res.ok) throw new Error(`Solana RPC returned ${res.status}`);
+      const json = await res.json();
+      const accounts = json?.result?.value || [];
+      return accounts.reduce((sum, account) => {
+        const amount = Number(account?.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
+        return sum + amount;
+      }, 0);
+    }
+
     async function loadTrollStats() {
       const balanceEl = document.getElementById("troll-balance");
       const usdEl = document.getElementById("troll-usd");
+      const marketLineEl = document.getElementById("market-line");
 
       try {
-        const res = await fetch(`https://public-api.solscan.io/account/tokens?account=${TROLL_WALLET}`);
-        if (!res.ok) throw new Error(`Token API returned ${res.status}`);
-
-        const tokens = await res.json();
-        const trollToken = (tokens || []).find((token) => {
-          const symbol = (token?.tokenSymbol || token?.symbol || "").toUpperCase();
-          return symbol === "TROLL";
-        });
-
-        if (!trollToken) throw new Error("$TROLL token not found in wallet");
-
-        const amount = Number(
-          trollToken?.tokenAmount?.uiAmount ??
-          trollToken?.amount ??
-          trollToken?.balance ??
-          0
-        );
-
-        const price = Number(
-          trollToken?.tokenPrice?.usd ??
-          trollToken?.priceUsdt ??
-          trollToken?.priceUSD ??
-          trollToken?.price ??
-          0
-        );
-
-        const usdValue = amount * price;
+        const [{ trollUsd, solUsd, source }, amount] = await Promise.all([
+          getPrices(),
+          getTrollBalance(),
+        ]);
+        const usdValue = amount * trollUsd;
 
         balanceEl.textContent = `${fmtNumber(amount)} TROLL`;
         usdEl.textContent = `$${fmtNumber(usdValue)}`;
+        marketLineEl.textContent = `${source} realtime: $TROLL $${fmtNumber(trollUsd)} | $SOL $${fmtNumber(solUsd)}`;
       } catch (err) {
         balanceEl.textContent = "Unavailable";
         usdEl.textContent = "Unavailable";
-        console.error("Unable to load $TROLL wallet stats", err);
+        if (marketLineEl) marketLineEl.textContent = "Market data unavailable.";
+        console.error("Unable to load $TROLL stats", err);
       }
     }
 
