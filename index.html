@@ -27,60 +27,135 @@
 
       const trollUsd = Number(json.pairs[0].priceUsd || 0);
 
-      return { trollUsd };
-    } catch (err) {
-      console.error("Price error:", err);
-      return { trollUsd: 0 };
-    }
-  }
+    <section class="hero">
+      <h1>Treasury Console</h1>
+      <p class="sub" id="market-line">Loading market data...</p>
 
-  async function getTrollBalance() {
-    try {
-      const res = await fetch(
-        `https://public-api.solscan.io/account/tokens?account=${TROLL_WALLET}`
-      );
+      <div class="stats">
+        <article class="stat">
+          <div class="label">$TROLL Balance</div>
+          <div id="troll-balance" class="value">Loading...</div>
+        </article>
+        <article class="stat">
+          <div class="label">USD Value</div>
+          <div id="troll-usd" class="value">Loading...</div>
+        </article>
+        <article class="stat">
+          <div class="label">System Status</div>
+          <div class="value">Trolling</div>
+        </article>
+      </div>
 
-      if (!res.ok) throw new Error("Solscan fetch failed");
+            <section class="donation" aria-label="Troll Fund wallet">
+        <h2>Troll Fund Wallet</h2>
+        <div class="wallet">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</div>
+      </section>
 
-      const tokens = await res.json();
+      <div class="grid">
+        <article class="card"><h3>Budget Dashboard</h3><p>Track monthly spend categories and compare against planned budgets.</p></article>
+        <article class="card"><h3>Campaign Costs</h3><p>Summarize route, print, and logistics costs for each sticker mission.</p></article>
+        <article class="card"><h3>Growth Planning</h3><p>Lay out future spend targets for scaling to new cities and drops.</p></article>
+      </div>
+    </section>
+  </div>
+  <script>
+    const TROLL_WALLET = "79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA";
+    const TROLL_MINT = "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2";
+    const SOL_MINT = "So11111111111111111111111111111111111111112";
 
       const trollToken = (tokens || []).find((token) => {
         const symbol = (token?.tokenSymbol || token?.symbol || "").toUpperCase();
         return symbol.includes("TROLL");
       });
-
-      return Number(
-        trollToken?.tokenAmount?.uiAmount ??
-        trollToken?.amount ??
-        trollToken?.balance ??
-        0
-      );
-    } catch (err) {
-      console.error("Balance error:", err);
-      return 0;
     }
-  }
 
-  async function loadTrollStats() {
-    const balanceEl = document.getElementById("troll-balance");
-    const usdEl = document.getElementById("troll-usd");
-    const marketLineEl = document.getElementById("market-line");
-
-    try {
-      const [{ trollUsd }, amount] = await Promise.all([
-        getPrices(),
-        getTrollBalance(),
+    async function getPricesFromDexScreener() {
+      const [trollRes, solRes] = await Promise.all([
+        fetch(`https://api.dexscreener.com/latest/dex/tokens/${TROLL_MINT}`),
+        fetch(`https://api.dexscreener.com/latest/dex/tokens/${SOL_MINT}`),
       ]);
+      if (!trollRes.ok || !solRes.ok) {
+        throw new Error(`DexScreener API error (${trollRes.status}/${solRes.status})`);
+      }
 
-      const usdValue = amount * trollUsd;
+      const [trollJson, solJson] = await Promise.all([trollRes.json(), solRes.json()]);
+      const trollPair = (trollJson?.pairs || []).find((pair) => pair?.chainId === "solana");
+      const solPair = (solJson?.pairs || []).find((pair) => pair?.chainId === "solana");
+      const trollUsd = Number(trollPair?.priceUsd || 0);
+      const solUsd = Number(solPair?.priceUsd || 0);
 
-      balanceEl.textContent = `${fmtNumber(amount)} TROLL`;
-      usdEl.textContent = `$${fmtNumber(usdValue)}`;
+      if (!trollUsd || !solUsd) throw new Error("DexScreener missing price data");
+      return { trollUsd, solUsd, source: "DexScreener" };
+    }
 
-      if (trollUsd > 0) {
-        marketLineEl.textContent = `Live: $TROLL $${fmtNumber(trollUsd)} (Dexscreener)`;
-      } else {
-        marketLineEl.textContent = "No market price yet (no liquidity)";
+    async function getPricesFromCoinGecko() {
+      const [solRes, trollRes] = await Promise.all([
+        fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"),
+        fetch(`https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${TROLL_MINT}&vs_currencies=usd`),
+      ]);
+      if (!solRes.ok || !trollRes.ok) {
+        throw new Error(`CoinGecko API error (${solRes.status}/${trollRes.status})`);
+      }
+      const [solJson, trollJson] = await Promise.all([solRes.json(), trollRes.json()]);
+      const solUsd = Number(solJson?.solana?.usd || 0);
+      const trollUsd = Number(trollJson?.[TROLL_MINT.toLowerCase()]?.usd || 0);
+      if (!trollUsd || !solUsd) throw new Error("CoinGecko missing price data");
+      return { trollUsd, solUsd, source: "CoinGecko" };
+    }
+
+    async function getPrices() {
+      try {
+        return await getPricesFromDexScreener();
+      } catch (dexErr) {
+        console.warn("DexScreener pricing failed, falling back to CoinGecko", dexErr);
+        return await getPricesFromCoinGecko();
+      }
+    }
+
+    async function getTrollBalance() {
+      const res = await fetch("https://api.mainnet-beta.solana.com", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "getTokenAccountsByOwner",
+          params: [
+            TROLL_WALLET,
+            { mint: TROLL_MINT },
+            { encoding: "jsonParsed" }
+          ]
+        }),
+      });
+      if (!res.ok) throw new Error(`Solana RPC returned ${res.status}`);
+      const json = await res.json();
+      const accounts = json?.result?.value || [];
+      return accounts.reduce((sum, account) => {
+        const amount = Number(account?.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
+        return sum + amount;
+      }, 0);
+    }
+
+    async function loadTrollStats() {
+      const balanceEl = document.getElementById("troll-balance");
+      const usdEl = document.getElementById("troll-usd");
+      const marketLineEl = document.getElementById("market-line");
+
+      try {
+        const [{ trollUsd, solUsd, source }, amount] = await Promise.all([
+          getPrices(),
+          getTrollBalance(),
+        ]);
+        const usdValue = amount * trollUsd;
+
+        balanceEl.textContent = `${fmtNumber(amount)} TROLL`;
+        usdEl.textContent = `$${fmtNumber(usdValue)}`;
+        marketLineEl.textContent = `${source} realtime: $TROLL $${fmtNumber(trollUsd)} | $SOL $${fmtNumber(solUsd)}`;
+      } catch (err) {
+        balanceEl.textContent = "Unavailable";
+        usdEl.textContent = "Unavailable";
+        if (marketLineEl) marketLineEl.textContent = "Market data unavailable.";
+        console.error("Unable to load $TROLL stats", err);
       }
     } catch (err) {
       console.error("Load error:", err);
