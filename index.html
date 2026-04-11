@@ -1,310 +1,96 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Troll Runner Finance</title>
 <script>
-if (window.location.hostname === 'trollrunner.net' || window.location.hostname === 'www.trollrunner.net') {
-  window.location.replace('https://finance.trollrunner.net');
-}
-</script>
-<style>
-:root {
-  --bg: #050806;
-  --panel: #0b140d;
-  --panel-soft: #101c13;
-  --line: rgba(126, 255, 142, 0.3);
-  --text: #d8ffe0;
-  --muted: #86bf93;
-  --accent: #7eff8e;
-  --accent-soft: rgba(126, 255, 142, 0.15);
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  min-height: 100vh;
-  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-  color: var(--text);
-  background:
-    radial-gradient(circle at 20% 10%, rgba(126, 255, 142, 0.12), transparent 40%),
-    radial-gradient(circle at 80% 0%, rgba(94, 176, 255, 0.08), transparent 35%),
-    linear-gradient(180deg, #070b08, #030503 55%);
-}
+  const TROLL_WALLET = "79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA";
+  const TROLL_MINT = "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2";
 
-.scanlines::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(126, 255, 142, 0.025) 0px,
-    rgba(126, 255, 142, 0.025) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-}
+  function fmtNumber(value) {
+    return Number(value || 0).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
 
-.wrap {
-  max-width: 1040px;
-  margin: 0 auto;
-  padding: 26px 18px 56px;
-}
+  async function getPrices() {
+    try {
+      const res = await fetch(
+        `https://api.dexscreener.com/latest/dex/tokens/${TROLL_MINT}`
+      );
 
-.top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: linear-gradient(180deg, rgba(126, 255, 142, 0.06), rgba(126, 255, 142, 0.02));
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4) inset;
-}
+      if (!res.ok) throw new Error("Dexscreener fetch failed");
 
-.brand { letter-spacing: 0.04em; font-weight: 700; }
-
-.pills { display: flex; gap: 8px; flex-wrap: wrap; }
-.pill {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 8px 12px;
-  color: var(--text);
-  text-decoration: none;
-  font-size: 12px;
-  background: var(--panel-soft);
-}
-.pill:hover { background: var(--accent-soft); }
-
-.hero {
-  margin-top: 20px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 22px;
-  background: linear-gradient(180deg, rgba(18, 29, 21, 0.8), rgba(7, 11, 8, 0.9));
-}
-
-h1 {
-  margin: 0 0 6px;
-  font-size: 32px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.sub {
-  margin: 0;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.stat {
-  padding: 14px;
-  border-radius: 10px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-}
-
-.label {
-  color: var(--muted);
-  text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 0.07em;
-}
-.value {
-  margin-top: 8px;
-  font-size: 26px;
-  color: var(--accent);
-  text-shadow: 0 0 12px rgba(126, 255, 142, 0.5);
-}
-
-.terminal {
-  margin-top: 14px;
-  padding: 14px;
-  border-radius: 10px;
-  background: #030603;
-  border: 1px solid var(--line);
-  font-size: 13px;
-  color: var(--muted);
-  white-space: pre-wrap;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 14px;
-}
-
-.card {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 14px;
-}
-
-.card h3 {
-  margin: 0 0 8px;
-  font-size: 15px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.card p { margin: 0; color: var(--muted); line-height: 1.5; font-size: 14px; }
-
-.donation {
-  margin-top: 14px;
-  padding: 14px;
-  border-radius: 10px;
-  background: linear-gradient(180deg, rgba(126, 255, 142, 0.08), rgba(126, 255, 142, 0.03));
-  border: 1px solid var(--line);
-}
-
-.donation h2 {
-  margin: 0 0 8px;
-  font-size: 16px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.donation p {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.55;
-  font-size: 14px;
-}
-
-.wallet {
-  margin-top: 10px;
-  padding: 12px;
-  border-radius: 8px;
-  background: #030603;
-  border: 1px dashed var(--line);
-  color: var(--text);
-  font-size: 13px;
-  overflow-wrap: anywhere;
-}
-
-@media (max-width: 860px) {
-  .stats, .grid { grid-template-columns: 1fr; }
-  h1 { font-size: 28px; }
-}
-</style>
-</head>
-<body class="scanlines">
-  <div class="wrap">
-    <div class="top">
-      <strong class="brand">💰 TROLLRUNNER.FINANCE</strong>
-      <nav class="pills" aria-label="Section links">
-        <a class="pill" href="https://blog.trollrunner.net">Blog</a>
-        <a class="pill" href="https://nutrition.trollrunner.net">Nutrition</a>
-        <a class="pill" href="https://trollrunner.net">Main Site</a>
-      </nav>
-    </div>
-
-    <section class="hero">
-      <h1>Treasury Console</h1>
-      <p class="sub" id="market-line">Loading market data...</p>
-
-      <div class="stats">
-        <article class="stat">
-          <div class="label">$TROLL Balance</div>
-          <div id="troll-balance" class="value">Loading...</div>
-        </article>
-        <article class="stat">
-          <div class="label">USD Value</div>
-          <div id="troll-usd" class="value">Loading...</div>
-        </article>
-        <article class="stat">
-          <div class="label">System Status</div>
-          <div class="value">Trolling</div>
-        </article>
-      </div>
-
-            <section class="donation" aria-label="Troll Fund wallet">
-        <h2>Troll Fund Wallet</h2>
-        <div class="wallet">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</div>
-      </section>
-
-      <div class="grid">
-        <article class="card"><h3>Budget Dashboard</h3><p>Track monthly spend categories and compare against planned budgets.</p></article>
-        <article class="card"><h3>Campaign Costs</h3><p>Summarize route, print, and logistics costs for each sticker mission.</p></article>
-        <article class="card"><h3>Growth Planning</h3><p>Lay out future spend targets for scaling to new cities and drops.</p></article>
-      </div>
-    </section>
-  </div>
-  <script>
-    const TROLL_WALLET = "79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA";
-
-    function fmtNumber(value) {
-      return Number(value || 0).toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-    }
-
-    async function getPrices() {
-      const coingeckoUrl =
-        "https://api.coingecko.com/api/v3/simple/price?ids=solana,troll-solana&vs_currencies=usd";
-      const res = await fetch(coingeckoUrl);
-      if (!res.ok) throw new Error(`CoinGecko API returned ${res.status}`);
       const json = await res.json();
-      const trollUsd = Number(json?.["troll-solana"]?.usd || 0);
-      const solUsd = Number(json?.solana?.usd || 0);
-      if (!trollUsd || !solUsd) throw new Error("Missing CoinGecko price data");
-      return { trollUsd, solUsd };
-    }
 
-    async function getTrollBalance() {
-      const res = await fetch(`https://public-api.solscan.io/account/tokens?account=${TROLL_WALLET}`);
-      if (!res.ok) throw new Error(`Token API returned ${res.status}`);
+      // 🔥 SAFE ACCESS
+      if (!json.pairs || json.pairs.length === 0) {
+        console.warn("No liquidity pool found for TROLL");
+        return { trollUsd: 0 };
+      }
+
+      const trollUsd = Number(json.pairs[0].priceUsd || 0);
+
+      return { trollUsd };
+    } catch (err) {
+      console.error("Price error:", err);
+      return { trollUsd: 0 };
+    }
+  }
+
+  async function getTrollBalance() {
+    try {
+      const res = await fetch(
+        `https://public-api.solscan.io/account/tokens?account=${TROLL_WALLET}`
+      );
+
+      if (!res.ok) throw new Error("Solscan fetch failed");
+
       const tokens = await res.json();
+
       const trollToken = (tokens || []).find((token) => {
         const symbol = (token?.tokenSymbol || token?.symbol || "").toUpperCase();
-        return symbol === "TROLL";
+        return symbol.includes("TROLL");
       });
-      if (!trollToken) throw new Error("$TROLL token not found in funding wallet");
+
       return Number(
         trollToken?.tokenAmount?.uiAmount ??
         trollToken?.amount ??
         trollToken?.balance ??
         0
       );
+    } catch (err) {
+      console.error("Balance error:", err);
+      return 0;
     }
+  }
 
-    async function loadTrollStats() {
-      const balanceEl = document.getElementById("troll-balance");
-      const usdEl = document.getElementById("troll-usd");
-      const marketLineEl = document.getElementById("market-line");
+  async function loadTrollStats() {
+    const balanceEl = document.getElementById("troll-balance");
+    const usdEl = document.getElementById("troll-usd");
+    const marketLineEl = document.getElementById("market-line");
 
-      try {
-        const [{ trollUsd, solUsd }, amount] = await Promise.all([
-          getPrices(),
-          getTrollBalance(),
-        ]);
-        const usdValue = amount * trollUsd;
+    try {
+      const [{ trollUsd }, amount] = await Promise.all([
+        getPrices(),
+        getTrollBalance(),
+      ]);
 
-        balanceEl.textContent = `${fmtNumber(amount)} TROLL`;
-        usdEl.textContent = `$${fmtNumber(usdValue)}`;
-        marketLineEl.textContent = `CoinGecko realtime: $TROLL $${fmtNumber(trollUsd)} | $SOL $${fmtNumber(solUsd)}`;
-      } catch (err) {
-        balanceEl.textContent = "Unavailable";
-        usdEl.textContent = "Unavailable";
-        if (marketLineEl) marketLineEl.textContent = "Market data unavailable.";
-        console.error("Unable to load $TROLL stats", err);
+      const usdValue = amount * trollUsd;
+
+      balanceEl.textContent = `${fmtNumber(amount)} TROLL`;
+      usdEl.textContent = `$${fmtNumber(usdValue)}`;
+
+      if (trollUsd > 0) {
+        marketLineEl.textContent = `Live: $TROLL $${fmtNumber(trollUsd)} (Dexscreener)`;
+      } else {
+        marketLineEl.textContent = "No market price yet (no liquidity)";
       }
-    }
+    } catch (err) {
+      console.error("Load error:", err);
 
-    loadTrollStats();
-  </script>
-</body>
-</html>
+      balanceEl.textContent = "0";
+      usdEl.textContent = "$0";
+      marketLineEl.textContent = "System online (data unavailable)";
+    }
+  }
+
+  loadTrollStats();
+  setInterval(loadTrollStats, 10000);
+</script>
