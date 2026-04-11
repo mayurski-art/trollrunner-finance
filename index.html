@@ -1,215 +1,31 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Troll Runner Finance</title>
 <script>
-if (window.location.hostname === 'trollrunner.net' || window.location.hostname === 'www.trollrunner.net') {
-  window.location.replace('https://finance.trollrunner.net');
-}
-</script>
-<style>
-:root {
-  --bg: #050806;
-  --panel: #0b140d;
-  --panel-soft: #101c13;
-  --line: rgba(126, 255, 142, 0.3);
-  --text: #d8ffe0;
-  --muted: #86bf93;
-  --accent: #7eff8e;
-  --accent-soft: rgba(126, 255, 142, 0.15);
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  min-height: 100vh;
-  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-  color: var(--text);
-  background:
-    radial-gradient(circle at 20% 10%, rgba(126, 255, 142, 0.12), transparent 40%),
-    radial-gradient(circle at 80% 0%, rgba(94, 176, 255, 0.08), transparent 35%),
-    linear-gradient(180deg, #070b08, #030503 55%);
-}
+  const TROLL_WALLET = "79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA";
+  const TROLL_MINT = "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2";
 
-.scanlines::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(126, 255, 142, 0.025) 0px,
-    rgba(126, 255, 142, 0.025) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-}
+  function fmtNumber(value) {
+    return Number(value || 0).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
 
-.wrap {
-  max-width: 1040px;
-  margin: 0 auto;
-  padding: 26px 18px 56px;
-}
+  async function getPrices() {
+    try {
+      const res = await fetch(
+        `https://api.dexscreener.com/latest/dex/tokens/${TROLL_MINT}`
+      );
 
-.top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: linear-gradient(180deg, rgba(126, 255, 142, 0.06), rgba(126, 255, 142, 0.02));
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4) inset;
-}
+      if (!res.ok) throw new Error("Dexscreener fetch failed");
 
-.brand { letter-spacing: 0.04em; font-weight: 700; }
+      const json = await res.json();
 
-.pills { display: flex; gap: 8px; flex-wrap: wrap; }
-.pill {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 8px 12px;
-  color: var(--text);
-  text-decoration: none;
-  font-size: 12px;
-  background: var(--panel-soft);
-}
-.pill:hover { background: var(--accent-soft); }
+      // 🔥 SAFE ACCESS
+      if (!json.pairs || json.pairs.length === 0) {
+        console.warn("No liquidity pool found for TROLL");
+        return { trollUsd: 0 };
+      }
 
-.hero {
-  margin-top: 20px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 22px;
-  background: linear-gradient(180deg, rgba(18, 29, 21, 0.8), rgba(7, 11, 8, 0.9));
-}
-
-h1 {
-  margin: 0 0 6px;
-  font-size: 32px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.sub {
-  margin: 0;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.stat {
-  padding: 14px;
-  border-radius: 10px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-}
-
-.label {
-  color: var(--muted);
-  text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 0.07em;
-}
-.value {
-  margin-top: 8px;
-  font-size: 26px;
-  color: var(--accent);
-  text-shadow: 0 0 12px rgba(126, 255, 142, 0.5);
-}
-
-.terminal {
-  margin-top: 14px;
-  padding: 14px;
-  border-radius: 10px;
-  background: #030603;
-  border: 1px solid var(--line);
-  font-size: 13px;
-  color: var(--muted);
-  white-space: pre-wrap;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 14px;
-}
-
-.card {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 14px;
-}
-
-.card h3 {
-  margin: 0 0 8px;
-  font-size: 15px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.card p { margin: 0; color: var(--muted); line-height: 1.5; font-size: 14px; }
-
-.donation {
-  margin-top: 14px;
-  padding: 14px;
-  border-radius: 10px;
-  background: linear-gradient(180deg, rgba(126, 255, 142, 0.08), rgba(126, 255, 142, 0.03));
-  border: 1px solid var(--line);
-}
-
-.donation h2 {
-  margin: 0 0 8px;
-  font-size: 16px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.donation p {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.55;
-  font-size: 14px;
-}
-
-.wallet {
-  margin-top: 10px;
-  padding: 12px;
-  border-radius: 8px;
-  background: #030603;
-  border: 1px dashed var(--line);
-  color: var(--text);
-  font-size: 13px;
-  overflow-wrap: anywhere;
-}
-
-@media (max-width: 860px) {
-  .stats, .grid { grid-template-columns: 1fr; }
-  h1 { font-size: 28px; }
-}
-</style>
-</head>
-<body class="scanlines">
-  <div class="wrap">
-    <div class="top">
-      <strong class="brand">💰 TROLLRUNNER.FINANCE</strong>
-      <nav class="pills" aria-label="Section links">
-        <a class="pill" href="https://blog.trollrunner.net">Blog</a>
-        <a class="pill" href="https://nutrition.trollrunner.net">Nutrition</a>
-        <a class="pill" href="https://trollrunner.net">Main Site</a>
-      </nav>
-    </div>
+      const trollUsd = Number(json.pairs[0].priceUsd || 0);
 
     <section class="hero">
       <h1>Treasury Console</h1>
@@ -247,10 +63,9 @@ h1 {
     const TROLL_MINT = "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2";
     const SOL_MINT = "So11111111111111111111111111111111111111112";
 
-    function fmtNumber(value) {
-      return Number(value || 0).toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
+      const trollToken = (tokens || []).find((token) => {
+        const symbol = (token?.tokenSymbol || token?.symbol || "").toUpperCase();
+        return symbol.includes("TROLL");
       });
     }
 
@@ -342,9 +157,15 @@ h1 {
         if (marketLineEl) marketLineEl.textContent = "Market data unavailable.";
         console.error("Unable to load $TROLL stats", err);
       }
-    }
+    } catch (err) {
+      console.error("Load error:", err);
 
-    loadTrollStats();
-  </script>
-</body>
-</html>
+      balanceEl.textContent = "0";
+      usdEl.textContent = "$0";
+      marketLineEl.textContent = "System online (data unavailable)";
+    }
+  }
+
+  loadTrollStats();
+  setInterval(loadTrollStats, 10000);
+</script>
