@@ -244,6 +244,7 @@ h1 {
   </div>
   <script>
     const TROLL_WALLET = "79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA";
+    const TROLL_MINT = "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2";
 
     function fmtNumber(value) {
       return Number(value || 0).toLocaleString(undefined, {
@@ -252,33 +253,61 @@ h1 {
       });
     }
 
-    async function getPrices() {
-      const coingeckoUrl =
-        "https://api.coingecko.com/api/v3/simple/price?ids=solana,troll-solana&vs_currencies=usd";
-      const res = await fetch(coingeckoUrl);
-      if (!res.ok) throw new Error(`CoinGecko API returned ${res.status}`);
+    async function getTrollPriceFromDexScreener() {
+      const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${TROLL_MINT}`);
+      if (!res.ok) throw new Error(`DexScreener API error (${res.status})`);
       const json = await res.json();
-      const trollUsd = Number(json?.["troll-solana"]?.usd || 0);
-      const solUsd = Number(json?.solana?.usd || 0);
-      if (!trollUsd || !solUsd) throw new Error("Missing CoinGecko price data");
-      return { trollUsd, solUsd };
+      const pair = (json?.pairs || []).find((item) => item?.chainId === "solana");
+      const trollUsd = Number(pair?.priceUsd || 0);
+      if (!trollUsd) throw new Error("DexScreener missing $TROLL price");
+      return { trollUsd, source: "DexScreener" };
+    }
+
+    async function getTrollPriceFromCoinGecko() {
+      const res = await fetch(`https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${TROLL_MINT}&vs_currencies=usd`);
+      if (!res.ok) throw new Error(`CoinGecko API error (${res.status})`);
+      const json = await res.json();
+      const trollUsd = Number(json?.[TROLL_MINT.toLowerCase()]?.usd || 0);
+      if (!trollUsd) throw new Error("CoinGecko missing $TROLL price");
+      return { trollUsd, source: "CoinGecko" };
+    }
+
+    async function getTrollPrice() {
+      try {
+        return await getTrollPriceFromDexScreener();
+      } catch (dexErr) {
+        console.warn("DexScreener price fetch failed, falling back to CoinGecko", dexErr);
+        try {
+          return await getTrollPriceFromCoinGecko();
+        } catch (cgErr) {
+          console.warn("CoinGecko price fetch also failed", cgErr);
+          return { trollUsd: 0, source: "Unavailable" };
+        }
+      }
     }
 
     async function getTrollBalance() {
-      const res = await fetch(`https://public-api.solscan.io/account/tokens?account=${TROLL_WALLET}`);
-      if (!res.ok) throw new Error(`Token API returned ${res.status}`);
-      const tokens = await res.json();
-      const trollToken = (tokens || []).find((token) => {
-        const symbol = (token?.tokenSymbol || token?.symbol || "").toUpperCase();
-        return symbol === "TROLL";
+      const res = await fetch("https://api.mainnet-beta.solana.com", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "getTokenAccountsByOwner",
+          params: [
+            TROLL_WALLET,
+            { mint: TROLL_MINT },
+            { encoding: "jsonParsed" }
+          ]
+        }),
       });
-      if (!trollToken) throw new Error("$TROLL token not found in funding wallet");
-      return Number(
-        trollToken?.tokenAmount?.uiAmount ??
-        trollToken?.amount ??
-        trollToken?.balance ??
-        0
-      );
+      if (!res.ok) throw new Error(`Solana RPC returned ${res.status}`);
+      const json = await res.json();
+      const accounts = json?.result?.value || [];
+      return accounts.reduce((sum, account) => {
+        const amount = Number(account?.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
+        return sum + amount;
+      }, 0);
     }
 
     async function loadTrollStats() {
@@ -287,15 +316,15 @@ h1 {
       const marketLineEl = document.getElementById("market-line");
 
       try {
-        const [{ trollUsd, solUsd }, amount] = await Promise.all([
-          getPrices(),
+        const [{ trollUsd, source }, amount] = await Promise.all([
+          getTrollPrice(),
           getTrollBalance(),
         ]);
         const usdValue = amount * trollUsd;
 
         balanceEl.textContent = `${fmtNumber(amount)} TROLL`;
         usdEl.textContent = `$${fmtNumber(usdValue)}`;
-        marketLineEl.textContent = `CoinGecko realtime: $TROLL $${fmtNumber(trollUsd)} | $SOL $${fmtNumber(solUsd)}`;
+        marketLineEl.textContent = `${source} realtime: $TROLL $${fmtNumber(trollUsd)}`;
       } catch (err) {
         balanceEl.textContent = "Unavailable";
         usdEl.textContent = "Unavailable";
