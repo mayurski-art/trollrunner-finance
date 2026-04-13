@@ -283,6 +283,8 @@ h1 {
             <section class="donation" aria-label="Troll Fund wallet">
         <h2>Troll Fund Wallet</h2>
         <div class="wallet">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</div>
+        <p style="margin-top:10px; color: var(--muted); font-size: 13px;">
+          Conversion rate: $6.90 = 1 mile ran = 1 sticker</p>
       </section>
 
       <div class="grid">
@@ -543,6 +545,46 @@ h1 {
       } finally {
         loadingStats = false;
       }
+
+      if (priceResult.status === "rejected") console.error("Unable to load $TROLL price", priceResult.reason);
+      if (balanceResult.status === "rejected") console.error("Unable to load $TROLL wallet balance", balanceResult.reason);
+
+        if (hasBalance && hasPrice) {
+          const endpoint = balanceResult.value.endpoint;
+          const recentBuys = await fetchRecentBuyEvents(endpoint, 10);
+          const ordered = recentBuys.sort((a, b) => (a.blockTime || 0) - (b.blockTime || 0));
+
+          if (!historyLoaded) {
+            ordered.slice(-5).forEach((buy) => {
+              seenBuySignatures.add(buy.signature);
+              const usdCost = buy.amountBought * priceResult.value.trollUsd;
+              totalBought += buy.amountBought;
+              totalUsdSpent += usdCost;
+              const avgCostUsd = totalBought ? (totalUsdSpent / totalBought) : priceResult.value.trollUsd;
+              const timeLabel = buy.blockTime ? new Date(buy.blockTime * 1000).toLocaleTimeString() : "recent";
+              addTransactionCard({ amountBought: buy.amountBought, usdCost, avgCostUsd, timeLabel });
+            });
+            historyLoaded = true;
+          } else {
+            ordered.forEach((buy) => {
+              if (!buy.signature || seenBuySignatures.has(buy.signature)) return;
+              seenBuySignatures.add(buy.signature);
+              const usdCost = buy.amountBought * priceResult.value.trollUsd;
+              totalBought += buy.amountBought;
+              totalUsdSpent += usdCost;
+              const avgCostUsd = totalBought ? (totalUsdSpent / totalBought) : priceResult.value.trollUsd;
+              const timeLabel = buy.blockTime ? new Date(buy.blockTime * 1000).toLocaleTimeString() : new Date().toLocaleTimeString();
+              addTransactionCard({ amountBought: buy.amountBought, usdCost, avgCostUsd, timeLabel });
+              showTransactionToast({ amountBought: buy.amountBought, usdCost, avgCostUsd });
+            });
+          }
+        }
+      } finally {
+        loadingStats = false;
+      }
+
+      if (priceResult.status === "rejected") console.error("Unable to load $TROLL price", priceResult.reason);
+      if (balanceResult.status === "rejected") console.error("Unable to load $TROLL wallet balance", balanceResult.reason);
     }
 
     loadTrollStats();
