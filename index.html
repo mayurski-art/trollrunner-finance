@@ -245,11 +245,32 @@ h1 {
   <script>
     const TROLL_WALLET = "79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA";
     const TROLL_MINT = "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2";
+    const SOLANA_RPC_ENDPOINTS = [
+      "https://solana-rpc.publicnode.com",
+      "https://api.mainnet-beta.solana.com",
+      "https://rpc.ankr.com/solana",
+    ];
 
-    function fmtNumber(value) {
+    function fmtTokenAmount(value) {
       return Number(value || 0).toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
+      });
+    }
+
+    function fmtUsd(value) {
+      return Number(value || 0).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+
+    function fmtPrice(value) {
+      const numeric = Number(value || 0);
+      const fractionDigits = numeric > 0 && numeric < 0.01 ? 8 : 4;
+      return numeric.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: fractionDigits,
       });
     }
 
@@ -262,8 +283,8 @@ h1 {
       return { trollUsd, source: "CoinGecko" };
     }
 
-    async function getTrollBalance() {
-      const res = await fetch("https://api.mainnet-beta.solana.com", {
+    async function getTrollBalanceFromEndpoint(endpoint) {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -277,13 +298,28 @@ h1 {
           ]
         }),
       });
-      if (!res.ok) throw new Error(`Solana RPC returned ${res.status}`);
+      if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
       const json = await res.json();
+      if (json?.error) throw new Error(`${endpoint} RPC error: ${json.error.message || "unknown"}`);
       const accounts = json?.result?.value || [];
-      return accounts.reduce((sum, account) => {
-        const amount = Number(account?.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
-        return sum + amount;
+      const amount = accounts.reduce((sum, account) => {
+        const tokenAmount = Number(account?.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
+        return sum + tokenAmount;
       }, 0);
+      return { amount, endpoint };
+    }
+
+    async function getTrollBalance() {
+      let lastError;
+      for (const endpoint of SOLANA_RPC_ENDPOINTS) {
+        try {
+          return await getTrollBalanceFromEndpoint(endpoint);
+        } catch (err) {
+          lastError = err;
+          console.warn(`Balance fetch failed on ${endpoint}`, err);
+        }
+      }
+      throw lastError || new Error("Unable to fetch balance from any Solana RPC endpoint");
     }
 
     async function loadTrollStats() {
@@ -291,22 +327,40 @@ h1 {
       const usdEl = document.getElementById("troll-usd");
       const marketLineEl = document.getElementById("market-line");
 
-      try {
-        const [{ trollUsd, source }, amount] = await Promise.all([
-          getTrollPrice(),
-          getTrollBalance(),
-        ]);
-        const usdValue = amount * trollUsd;
+      const [priceResult, balanceResult] = await Promise.allSettled([
+        getTrollPrice(),
+        getTrollBalance(),
+      ]);
 
-        balanceEl.textContent = `${fmtNumber(amount)} TROLL`;
-        usdEl.textContent = `$${fmtNumber(usdValue)}`;
-        marketLineEl.textContent = `${source} realtime: $TROLL $${fmtNumber(trollUsd)}`;
-      } catch (err) {
+      const hasPrice = priceResult.status === "fulfilled";
+      const hasBalance = balanceResult.status === "fulfilled";
+
+      if (hasBalance) {
+        balanceEl.textContent = `${fmtTokenAmount(balanceResult.value.amount)} TROLL`;
+      } else {
         balanceEl.textContent = "Unavailable";
-        usdEl.textContent = "Unavailable";
-        if (marketLineEl) marketLineEl.textContent = "Market data unavailable.";
-        console.error("Unable to load $TROLL stats", err);
       }
+
+      if (hasPrice && hasBalance) {
+        const usdValue = balanceResult.value.amount * priceResult.value.trollUsd;
+        usdEl.textContent = `$${fmtUsd(usdValue)}`;
+        marketLineEl.textContent = `${priceResult.value.source} live: $TROLL $${fmtPrice(priceResult.value.trollUsd)} | Wallet via ${new URL(balanceResult.value.endpoint).hostname}`;
+        return;
+      }
+
+      if (hasPrice) {
+        usdEl.textContent = "Waiting on wallet...";
+        marketLineEl.textContent = `${priceResult.value.source} live: $TROLL $${fmtPrice(priceResult.value.trollUsd)} | Wallet RPC unavailable`;
+      } else if (hasBalance) {
+        usdEl.textContent = "Waiting on price...";
+        marketLineEl.textContent = `Wallet loaded (${new URL(balanceResult.value.endpoint).hostname}) | CoinGecko unavailable`;
+      } else {
+        usdEl.textContent = "Unavailable";
+        marketLineEl.textContent = "Market and wallet data unavailable.";
+      }
+
+      if (priceResult.status === "rejected") console.error("Unable to load $TROLL price", priceResult.reason);
+      if (balanceResult.status === "rejected") console.error("Unable to load $TROLL wallet balance", balanceResult.reason);
     }
 
     loadTrollStats();
