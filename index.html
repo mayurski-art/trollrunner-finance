@@ -194,56 +194,6 @@ h1 {
   overflow-wrap: anywhere;
 }
 
-
-.tx-feed {
-  margin-top: 10px;
-  display: grid;
-  gap: 8px;
-}
-
-.tx-item {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: rgba(126, 255, 142, 0.08);
-  font-size: 12px;
-  color: var(--text);
-}
-
-.tx-title {
-  font-size: 11px;
-  color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 4px;
-}
-
-.tx-toasts {
-  position: fixed;
-  top: 14px;
-  right: 14px;
-  width: min(320px, calc(100vw - 28px));
-  display: grid;
-  gap: 8px;
-  z-index: 50;
-}
-
-.tx-toast {
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(16, 28, 19, 0.96), rgba(3, 6, 3, 0.96));
-  border-radius: 10px;
-  padding: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  font-size: 12px;
-  color: var(--text);
-  animation: txSlideIn 240ms ease-out;
-}
-
-@keyframes txSlideIn {
-  from { transform: translateY(-8px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
 @media (max-width: 860px) {
   .stats, .grid { grid-template-columns: 1fr; }
   h1 { font-size: 28px; }
@@ -288,14 +238,11 @@ h1 {
       </section>
 
       <div class="grid">
-        <article class="card"><h3>Budget Dashboard</h3><p>Live TROLL activity appears below (buys, sells, transfers — full history + 30s live refresh).</p><div id="tx-feed" class="tx-feed" aria-live="polite"></div></article>
-        <article class="card"><h3>Campaign Costs</h3><p>Summarize route, print, and logistics costs for each sticker mission.</p></article>
+        <article class="card"><h3>Budget Dashboard</h3><p>Track monthly spend categories and compare against planned budgets.</p></article>
         <article class="card"><h3>Growth Planning</h3><p>Lay out future spend targets for scaling to new cities and drops.</p></article>
       </div>
     </section>
   </div>
-  <div id="tx-toasts" class="tx-toasts" aria-live="polite"></div>
-
   <script>
     const TROLL_WALLET = "79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA";
     const TROLL_MINT = "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2";
@@ -304,11 +251,6 @@ h1 {
       "https://api.mainnet-beta.solana.com",
       "https://rpc.ankr.com/solana",
     ];
-
-    let loadingStats = false;
-    let historyLoaded = false;
-    let backfillStarted = false;
-    const seenIncomingSignatures = new Set();
 
     function fmtTokenAmount(value) {
       return Number(value || 0).toLocaleString(undefined, {
@@ -342,141 +284,30 @@ h1 {
       return { trollUsd, source: "CoinGecko" };
     }
 
-    async function rpcCall(endpoint, method, params) {
+    async function getTrollBalanceFromEndpoint(endpoint) {
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "getTokenAccountsByOwner",
+          params: [
+            TROLL_WALLET,
+            { mint: TROLL_MINT },
+            { encoding: "jsonParsed" }
+          ]
+        }),
       });
       if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
       const json = await res.json();
       if (json?.error) throw new Error(`${endpoint} RPC error: ${json.error.message || "unknown"}`);
-      return json?.result;
-    }
-
-    function tokenAmountForWallet(tokenBalances = []) {
-      return (tokenBalances || [])
-        .filter((entry) => entry?.owner === TROLL_WALLET && entry?.mint === TROLL_MINT)
-        .reduce((sum, entry) => sum + Number(entry?.uiTokenAmount?.uiAmount || 0), 0);
-    }
-
-    function extractTokenEventFromTransaction(tx) {
-      const meta = tx?.meta;
-      if (!meta) return null;
-      const pre = tokenAmountForWallet(meta.preTokenBalances);
-      const post = tokenAmountForWallet(meta.postTokenBalances);
-      const delta = post - pre;
-      if (delta === 0) return null;
-      return {
-        signature: tx?.transaction?.signatures?.[0],
-        tokenDelta: delta,
-        direction: delta > 0 ? "incoming" : "outgoing",
-      };
-    }
-
-    async function fetchSignaturesForAddress(endpoint, address, { limit = 30, before } = {}) {
-      const params = [address, { limit, ...(before ? { before } : {}) }];
-      try {
-        return await rpcCall(endpoint, "getSignaturesForAddress", params);
-      } catch (err) {
-        console.warn(`Signature fetch failed for ${address}`, err);
-        return [];
-      }
-    }
-
-    async function fetchEventsForSignatures(endpoint, signatureInfos) {
-      const events = [];
-      for (const sigInfo of signatureInfos) {
-        if (!sigInfo?.signature || seenIncomingSignatures.has(sigInfo.signature)) continue;
-
-        let tx;
-        try {
-          tx = await rpcCall(endpoint, "getTransaction", [
-            sigInfo.signature,
-            { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 },
-          ]);
-        } catch (err) {
-          console.warn(`Transaction fetch failed for ${sigInfo.signature}`, err);
-          continue;
-        }
-
-        const event = extractTokenEventFromTransaction(tx);
-        if (!event) continue;
-        seenIncomingSignatures.add(event.signature);
-        events.push({ ...event, blockTime: tx?.blockTime || sigInfo?.blockTime || null });
-      }
-      return events;
-    }
-
-    async function fetchRecentTokenEvents(endpoint, addresses) {
-      const signatureMap = new Map();
-      for (const address of addresses) {
-        const signatures = await fetchSignaturesForAddress(endpoint, address, { limit: 30 });
-        for (const sigInfo of signatures || []) {
-          if (!sigInfo?.signature) continue;
-          signatureMap.set(sigInfo.signature, sigInfo);
-        }
-      }
-      return fetchEventsForSignatures(endpoint, Array.from(signatureMap.values()));
-    }
-
-    async function startHistoryBackfill(endpoint, addresses, priceUsd) {
-      if (backfillStarted) return;
-      backfillStarted = true;
-
-      const cursors = new Map(addresses.map((address) => [address, null]));
-      const completed = new Set();
-
-      while (completed.size < addresses.length) {
-        const signatureMap = new Map();
-
-        for (const address of addresses) {
-          if (completed.has(address)) continue;
-          const before = cursors.get(address);
-          const page = await fetchSignaturesForAddress(endpoint, address, { limit: 100, before });
-
-          if (!page.length) {
-            completed.add(address);
-            continue;
-          }
-
-          for (const sigInfo of page) {
-            if (!sigInfo?.signature) continue;
-            signatureMap.set(sigInfo.signature, sigInfo);
-          }
-
-          const lastSignature = page[page.length - 1]?.signature;
-          if (!lastSignature || page.length < 100) completed.add(address);
-          cursors.set(address, lastSignature || before);
-        }
-
-        if (!signatureMap.size) continue;
-        const events = await fetchEventsForSignatures(endpoint, Array.from(signatureMap.values()));
-        const ordered = events.sort((a, b) => (a.blockTime || 0) - (b.blockTime || 0));
-
-        ordered.forEach((event) => {
-          const usdValue = Math.abs(event.tokenDelta) * priceUsd;
-          const timeLabel = event.blockTime ? new Date(event.blockTime * 1000).toLocaleString() : "historical";
-          addTransactionCard({ tokenDelta: event.tokenDelta, usdValue, priceUsd, timeLabel, direction: event.direction });
-        });
-
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-    }
-
-    async function getTrollBalanceFromEndpoint(endpoint) {
-      const result = await rpcCall(endpoint, "getTokenAccountsByOwner", [
-        TROLL_WALLET,
-        { mint: TROLL_MINT },
-        { encoding: "jsonParsed" }
-      ]);
-      const accounts = result?.value || [];
+      const accounts = json?.result?.value || [];
       const amount = accounts.reduce((sum, account) => {
         const tokenAmount = Number(account?.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
         return sum + tokenAmount;
       }, 0);
-      const tokenAccountAddresses = accounts.map((account) => account?.pubkey).filter(Boolean);
-      return { amount, endpoint, tokenAccountAddresses };
+      return { amount, endpoint };
     }
 
     async function getTrollBalance() {
@@ -492,59 +323,15 @@ h1 {
       throw lastError || new Error("Unable to fetch balance from any Solana RPC endpoint");
     }
 
-
-    function addTransactionCard({ tokenDelta, usdValue, priceUsd, timeLabel, direction }) {
-      const feed = document.getElementById("tx-feed");
-      if (!feed) return;
-      const card = document.createElement("div");
-      card.className = "tx-item";
-      card.innerHTML = `
-        <div class="tx-title">${direction === "incoming" ? "Incoming" : "Outgoing"} TROLL · ${timeLabel}</div>
-        <div>${tokenDelta > 0 ? "+" : "-"}${fmtTokenAmount(Math.abs(tokenDelta))} TROLL</div>
-        <div>Est. USD value: $${fmtUsd(usdValue)}</div>
-        <div>Price snapshot: $${fmtPrice(priceUsd)} / TROLL</div>
-      `;
-      feed.prepend(card);
-    }
-
-    function showTransactionToast({ tokenDelta, usdValue, priceUsd, direction }) {
-      const toastWrap = document.getElementById("tx-toasts");
-      if (!toastWrap) return;
-      const toast = document.createElement("div");
-      toast.className = "tx-toast";
-      toast.innerHTML = `
-        <div class="tx-title">New TROLL ${direction === "incoming" ? "incoming" : "outgoing"}</div>
-        <div>${tokenDelta > 0 ? "+" : "-"}${fmtTokenAmount(Math.abs(tokenDelta))} TROLL</div>
-        <div>$${fmtUsd(usdValue)} est. value · px $${fmtPrice(priceUsd)}</div>
-      `;
-      toastWrap.prepend(toast);
-      setTimeout(() => toast.remove(), 8000);
-      while (toastWrap.children.length > 4) toastWrap.removeChild(toastWrap.lastElementChild);
-    }
-
-    function ensureFeedPlaceholder(message) {
-      const feed = document.getElementById("tx-feed");
-      if (!feed) return;
-      if (feed.children.length > 0) return;
-      const placeholder = document.createElement("div");
-      placeholder.className = "tx-item";
-      placeholder.textContent = message;
-      feed.appendChild(placeholder);
-    }
-
     async function loadTrollStats() {
-      if (loadingStats) return;
-      loadingStats = true;
+      const balanceEl = document.getElementById("troll-balance");
+      const usdEl = document.getElementById("troll-usd");
+      const marketLineEl = document.getElementById("market-line");
 
-      try {
-        const balanceEl = document.getElementById("troll-balance");
-        const usdEl = document.getElementById("troll-usd");
-        const marketLineEl = document.getElementById("market-line");
-
-        const [priceResult, balanceResult] = await Promise.allSettled([
-          getTrollPrice(),
-          getTrollBalance(),
-        ]);
+      const [priceResult, balanceResult] = await Promise.allSettled([
+        getTrollPrice(),
+        getTrollBalance(),
+      ]);
 
       const hasPrice = priceResult.status === "fulfilled";
       const hasBalance = balanceResult.status === "fulfilled";
@@ -559,7 +346,10 @@ h1 {
         const usdValue = balanceResult.value.amount * priceResult.value.trollUsd;
         usdEl.textContent = `$${fmtUsd(usdValue)}`;
         marketLineEl.textContent = `${priceResult.value.source} live: $TROLL $${fmtPrice(priceResult.value.trollUsd)} | Wallet via ${new URL(balanceResult.value.endpoint).hostname}`;
-      } else if (hasPrice) {
+        return;
+      }
+
+      if (hasPrice) {
         usdEl.textContent = "Waiting on wallet...";
         marketLineEl.textContent = `${priceResult.value.source} live: $TROLL $${fmtPrice(priceResult.value.trollUsd)} | Wallet RPC unavailable`;
       } else if (hasBalance) {
@@ -572,42 +362,9 @@ h1 {
 
       if (priceResult.status === "rejected") console.error("Unable to load $TROLL price", priceResult.reason);
       if (balanceResult.status === "rejected") console.error("Unable to load $TROLL wallet balance", balanceResult.reason);
-
-        if (hasBalance && hasPrice) {
-          const endpoint = balanceResult.value.endpoint;
-          const watchAddresses = [TROLL_WALLET, ...(balanceResult.value.tokenAccountAddresses || [])];
-
-          const liveEvents = await fetchRecentTokenEvents(endpoint, watchAddresses);
-          const orderedLive = liveEvents.sort((a, b) => (a.blockTime || 0) - (b.blockTime || 0));
-
-          orderedLive.forEach((event) => {
-            const usdValue = Math.abs(event.tokenDelta) * priceResult.value.trollUsd;
-            const timeLabel = event.blockTime ? new Date(event.blockTime * 1000).toLocaleString() : new Date().toLocaleString();
-            addTransactionCard({ tokenDelta: event.tokenDelta, usdValue, priceUsd: priceResult.value.trollUsd, timeLabel, direction: event.direction });
-            if (historyLoaded) {
-              showTransactionToast({ tokenDelta: event.tokenDelta, usdValue, priceUsd: priceResult.value.trollUsd, direction: event.direction });
-            }
-          });
-
-          if (!historyLoaded) {
-            historyLoaded = true;
-            ensureFeedPlaceholder("No TROLL transfers found yet.");
-            startHistoryBackfill(endpoint, watchAddresses, priceResult.value.trollUsd);
-          }
-        }
-      } catch (err) {
-        console.error("Unable to process TROLL transaction feed", err);
-        ensureFeedPlaceholder("Transaction feed unavailable right now. Retrying...");
-      } finally {
-        loadingStats = false;
-      }
-
-      if (priceResult.status === "rejected") console.error("Unable to load $TROLL price", priceResult.reason);
-      if (balanceResult.status === "rejected") console.error("Unable to load $TROLL wallet balance", balanceResult.reason);
     }
 
     loadTrollStats();
-    setInterval(loadTrollStats, 30000);
   </script>
 </body>
 </html>
