@@ -253,52 +253,13 @@ h1 {
       });
     }
 
-    async function getTrollPriceFromMobula() {
-      const url = `https://demo-api.mobula.io/api/2/market/details?blockchain=solana&address=${TROLL_MINT}&currencies=troll`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Mobula API error (${res.status})`);
-      const json = await res.json();
-      const trollUsd = Number(json?.data?.priceUSD || json?.data?.base?.priceUSD || 0);
-      if (!trollUsd) throw new Error("Mobula missing $TROLL price");
-      return { trollUsd, source: "Mobula" };
-    }
-
-    async function getTrollPriceFromDexScreener() {
-      const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${TROLL_MINT}`);
-      if (!res.ok) throw new Error(`DexScreener API error (${res.status})`);
-      const json = await res.json();
-      const pair = (json?.pairs || []).find((item) => item?.chainId === "solana");
-      const trollUsd = Number(pair?.priceUsd || 0);
-      if (!trollUsd) throw new Error("DexScreener missing $TROLL price");
-      return { trollUsd, source: "DexScreener" };
-    }
-
-    async function getTrollPriceFromCoinGecko() {
-      const res = await fetch(`https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${TROLL_MINT}&vs_currencies=usd`);
+    async function getTrollPrice() {
+      const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=troll-2&vs_currencies=usd");
       if (!res.ok) throw new Error(`CoinGecko API error (${res.status})`);
       const json = await res.json();
-      const trollUsd = Number(json?.[TROLL_MINT.toLowerCase()]?.usd || 0);
-      if (!trollUsd) throw new Error("CoinGecko missing $TROLL price");
+      const trollUsd = Number(json?.["troll-2"]?.usd || 0);
+      if (!trollUsd) throw new Error("CoinGecko missing troll-2 USD price");
       return { trollUsd, source: "CoinGecko" };
-    }
-
-    async function getTrollPrice() {
-      try {
-        return await getTrollPriceFromMobula();
-      } catch (mobulaErr) {
-        console.warn("Mobula price fetch failed, falling back to DexScreener", mobulaErr);
-        try {
-          return await getTrollPriceFromDexScreener();
-        } catch (dexErr) {
-          console.warn("DexScreener price fetch failed, falling back to CoinGecko", dexErr);
-          try {
-            return await getTrollPriceFromCoinGecko();
-          } catch (cgErr) {
-            console.warn("CoinGecko price fetch also failed", cgErr);
-            return { trollUsd: 0, source: "Unavailable" };
-          }
-        }
-      }
     }
 
     async function getTrollBalance() {
