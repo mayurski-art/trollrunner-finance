@@ -161,14 +161,6 @@ h1 {
 
 .card p { margin: 0; color: var(--muted); line-height: 1.5; font-size: 14px; }
 
-.transfers-panel {
-  margin-top: 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 14px;
-  background: var(--panel);
-}
-
 .transfers-header {
   display: flex;
   justify-content: space-between;
@@ -315,7 +307,15 @@ h1 {
       </section>
 
       <div class="grid">
-        <article class="card"><h3>Budget Dashboard</h3><p>Track monthly spend categories and compare against planned budgets.</p></article>
+        <article class="card">
+          <h3>Budget Dashboard</h3>
+          <p>Track monthly spend categories and compare against planned budgets.</p>
+          <div class="transfers-header" style="margin-top: 10px;">
+            <h3 style="font-size: 13px;">Recent $TROLL Transfers</h3>
+            <span class="transfers-note" id="transfer-status">Loading recent transfers...</span>
+          </div>
+          <div id="transfer-list" class="transfer-list"></div>
+        </article>
         <article class="card"><h3>Growth Planning</h3><p>Lay out future spend targets for scaling to new cities and drops.</p></article>
       </div>
 
@@ -337,6 +337,7 @@ h1 {
       "https://rpc.ankr.com/solana",
     ];
     const MAX_TRANSFER_ITEMS = 12;
+    const MAX_SIGNATURE_SCAN = 250;
     let latestTrollUsd = null;
     let cachedTransfers = [];
 
@@ -444,7 +445,7 @@ h1 {
     async function resolveSolName(address) {
       if (!address) return null;
       try {
-        const res = await fetch(`https://sns-sdk-proxy.bonfida.workers.dev/resolve/${address}`);
+        const res = await fetch(`https://sns-sdk-proxy.bonfida.workers.dev/reverse/${address}`);
         if (!res.ok) return null;
         const json = await res.json();
         if (!json?.result) return null;
@@ -473,7 +474,10 @@ h1 {
     }
 
     function findCounterparty(tx, direction) {
-      const instructions = tx?.transaction?.message?.instructions || [];
+      const instructions = [
+        ...(tx?.transaction?.message?.instructions || []),
+        ...((tx?.meta?.innerInstructions || []).flatMap((group) => group.instructions || [])),
+      ];
       for (const instruction of instructions) {
         const parsed = instruction?.parsed;
         const type = parsed?.type;
@@ -488,11 +492,18 @@ h1 {
     }
 
     async function getRecentTrollTransfers() {
-      const signatures = await rpcRequest("getSignaturesForAddress", [
-        TROLL_WALLET,
-        { limit: 25 }
-      ]);
-
+      const signatures = [];
+      let before = null;
+      while (signatures.length < MAX_SIGNATURE_SCAN) {
+        const batch = await rpcRequest("getSignaturesForAddress", [
+          TROLL_WALLET,
+          { limit: 50, ...(before ? { before } : {}) }
+        ]);
+        if (!batch.length) break;
+        signatures.push(...batch);
+        before = batch[batch.length - 1].signature;
+        if (batch.length < 50) break;
+      }
       const transferRows = [];
       for (const item of signatures) {
         if (!item?.signature) continue;
