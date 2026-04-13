@@ -288,7 +288,7 @@ h1 {
       </section>
 
       <div class="grid">
-        <article class="card"><h3>Budget Dashboard</h3><p>Live buy notifications will appear below as transactions are detected from the wallet.</p><div id="tx-feed" class="tx-feed" aria-live="polite"></div></article>
+        <article class="card"><h3>Budget Dashboard</h3><p>Live buy notifications appear below from recent wallet transactions (auto-refresh every 30s).</p><div id="tx-feed" class="tx-feed" aria-live="polite"></div></article>
         <article class="card"><h3>Campaign Costs</h3><p>Summarize route, print, and logistics costs for each sticker mission.</p></article>
         <article class="card"><h3>Growth Planning</h3><p>Lay out future spend targets for scaling to new cities and drops.</p></article>
       </div>
@@ -305,10 +305,11 @@ h1 {
       "https://rpc.ankr.com/solana",
     ];
 
-    let lastSeenBalance = null;
     let totalBought = 0;
     let totalUsdSpent = 0;
     let loadingStats = false;
+    let historyLoaded = false;
+    const seenBuySignatures = new Set();
 
     function fmtTokenAmount(value) {
       return Number(value || 0).toLocaleString(undefined, {
@@ -342,25 +343,63 @@ h1 {
       return { trollUsd, source: "CoinGecko" };
     }
 
-    async function getTrollBalanceFromEndpoint(endpoint) {
+    async function rpcCall(endpoint, method, params) {
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getTokenAccountsByOwner",
-          params: [
-            TROLL_WALLET,
-            { mint: TROLL_MINT },
-            { encoding: "jsonParsed" }
-          ]
-        }),
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
       });
       if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
       const json = await res.json();
       if (json?.error) throw new Error(`${endpoint} RPC error: ${json.error.message || "unknown"}`);
-      const accounts = json?.result?.value || [];
+      return json?.result;
+    }
+
+    function tokenAmountForWallet(tokenBalances = []) {
+      return (tokenBalances || [])
+        .filter((entry) => entry?.owner === TROLL_WALLET && entry?.mint === TROLL_MINT)
+        .reduce((sum, entry) => sum + Number(entry?.uiTokenAmount?.uiAmount || 0), 0);
+    }
+
+    function extractBuyFromTransaction(tx) {
+      const meta = tx?.meta;
+      if (!meta) return null;
+      const pre = tokenAmountForWallet(meta.preTokenBalances);
+      const post = tokenAmountForWallet(meta.postTokenBalances);
+      const delta = post - pre;
+      if (delta <= 0) return null;
+      return {
+        signature: tx?.transaction?.signatures?.[0],
+        amountBought: delta,
+      };
+    }
+
+    async function fetchRecentBuyEvents(endpoint, maxSignatures = 12) {
+      const signatures = await rpcCall(endpoint, "getSignaturesForAddress", [
+        TROLL_WALLET,
+        { limit: maxSignatures },
+      ]);
+      const buys = [];
+      for (const sigInfo of signatures || []) {
+        if (!sigInfo?.signature) continue;
+        const tx = await rpcCall(endpoint, "getTransaction", [
+          sigInfo.signature,
+          { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 },
+        ]);
+        const buy = extractBuyFromTransaction(tx);
+        if (!buy) continue;
+        buys.push({ ...buy, blockTime: tx?.blockTime || sigInfo?.blockTime || null });
+      }
+      return buys;
+    }
+
+    async function getTrollBalanceFromEndpoint(endpoint) {
+      const result = await rpcCall(endpoint, "getTokenAccountsByOwner", [
+        TROLL_WALLET,
+        { mint: TROLL_MINT },
+        { encoding: "jsonParsed" }
+      ]);
+      const accounts = result?.value || [];
       const amount = accounts.reduce((sum, account) => {
         const tokenAmount = Number(account?.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
         return sum + tokenAmount;
@@ -454,19 +493,34 @@ h1 {
       if (balanceResult.status === "rejected") console.error("Unable to load $TROLL wallet balance", balanceResult.reason);
 
         if (hasBalance && hasPrice) {
-          const currentBalance = balanceResult.value.amount;
-          if (lastSeenBalance !== null && currentBalance > lastSeenBalance) {
-            const amountBought = currentBalance - lastSeenBalance;
-            const usdCost = amountBought * priceResult.value.trollUsd;
-            totalBought += amountBought;
-            totalUsdSpent += usdCost;
-            const avgCostUsd = totalBought ? (totalUsdSpent / totalBought) : priceResult.value.trollUsd;
-            const timeLabel = new Date().toLocaleTimeString();
+          const endpoint = balanceResult.value.endpoint;
+          const recentBuys = await fetchRecentBuyEvents(endpoint, 10);
+          const ordered = recentBuys.sort((a, b) => (a.blockTime || 0) - (b.blockTime || 0));
 
-            addTransactionCard({ amountBought, usdCost, avgCostUsd, timeLabel });
-            showTransactionToast({ amountBought, usdCost, avgCostUsd });
+          if (!historyLoaded) {
+            ordered.slice(-5).forEach((buy) => {
+              seenBuySignatures.add(buy.signature);
+              const usdCost = buy.amountBought * priceResult.value.trollUsd;
+              totalBought += buy.amountBought;
+              totalUsdSpent += usdCost;
+              const avgCostUsd = totalBought ? (totalUsdSpent / totalBought) : priceResult.value.trollUsd;
+              const timeLabel = buy.blockTime ? new Date(buy.blockTime * 1000).toLocaleTimeString() : "recent";
+              addTransactionCard({ amountBought: buy.amountBought, usdCost, avgCostUsd, timeLabel });
+            });
+            historyLoaded = true;
+          } else {
+            ordered.forEach((buy) => {
+              if (!buy.signature || seenBuySignatures.has(buy.signature)) return;
+              seenBuySignatures.add(buy.signature);
+              const usdCost = buy.amountBought * priceResult.value.trollUsd;
+              totalBought += buy.amountBought;
+              totalUsdSpent += usdCost;
+              const avgCostUsd = totalBought ? (totalUsdSpent / totalBought) : priceResult.value.trollUsd;
+              const timeLabel = buy.blockTime ? new Date(buy.blockTime * 1000).toLocaleTimeString() : new Date().toLocaleTimeString();
+              addTransactionCard({ amountBought: buy.amountBought, usdCost, avgCostUsd, timeLabel });
+              showTransactionToast({ amountBought: buy.amountBought, usdCost, avgCostUsd });
+            });
           }
-          lastSeenBalance = currentBalance;
         }
       } finally {
         loadingStats = false;
