@@ -283,6 +283,8 @@ h1 {
             <section class="donation" aria-label="Troll Fund wallet">
         <h2>Troll Fund Wallet</h2>
         <div class="wallet">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</div>
+        <p style="margin-top:10px; color: var(--muted); font-size: 13px;">
+          Conversion rate: $6.90 = 1 mile ran = 1 sticker</p>
       </section>
 
       <div class="grid">
@@ -523,6 +525,9 @@ h1 {
       } finally {
         loadingStats = false;
       }
+
+      if (priceResult.status === "rejected") console.error("Unable to load $TROLL price", priceResult.reason);
+      if (balanceResult.status === "rejected") console.error("Unable to load $TROLL wallet balance", balanceResult.reason);
     }
 
     loadTrollStats();
