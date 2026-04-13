@@ -161,6 +161,38 @@ h1 {
 
 .card p { margin: 0; color: var(--muted); line-height: 1.5; font-size: 14px; }
 
+.budget-board {
+  display: grid;
+  gap: 12px;
+}
+
+.transfer-list {
+  max-height: 360px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.transfer-item {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(126, 255, 142, 0.25);
+  border-radius: 8px;
+  background: #040805;
+  font-size: 12px;
+}
+.tx-hash { color: var(--muted); text-decoration: none; }
+.tx-hash:hover { color: var(--accent); }
+.amount-out { color: #ff8f8f; }
+.amount-in { color: var(--accent); }
+
+.budget-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .donation {
   margin-top: 14px;
   padding: 14px;
@@ -196,6 +228,7 @@ h1 {
 
 @media (max-width: 860px) {
   .stats, .grid { grid-template-columns: 1fr; }
+  .transfer-list { grid-template-columns: 1fr; }
   h1 { font-size: 28px; }
 }
 </style>
@@ -238,7 +271,13 @@ h1 {
       </section>
 
       <div class="grid">
-        <article class="card"><h3>Budget Dashboard</h3><p>Track monthly spend categories and compare against planned budgets.</p></article>
+        <article class="card">
+          <h3>Budget Dashboard</h3>
+          <div class="budget-board">
+            <p class="budget-note" id="transfer-note">Loading wallet transfer history...</p>
+            <div id="transfer-list" class="transfer-list"></div>
+          </div>
+        </article>
         <article class="card"><h3>Growth Planning</h3><p>Lay out future spend targets for scaling to new cities and drops.</p></article>
       </div>
     </section>
@@ -251,6 +290,8 @@ h1 {
       "https://api.mainnet-beta.solana.com",
       "https://rpc.ankr.com/solana",
     ];
+    const SIGNATURE_PAGE_SIZE = 1000;
+    const MAX_SIGNATURES = 2000;
 
     function fmtTokenAmount(value) {
       return Number(value || 0).toLocaleString(undefined, {
@@ -273,6 +314,50 @@ h1 {
         minimumFractionDigits: 2,
         maximumFractionDigits: fractionDigits,
       });
+    }
+
+    function fmtCompactDate(unixSeconds) {
+      if (!unixSeconds) return "Unknown date";
+      return new Date(unixSeconds * 1000).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    }
+
+    async function rpcRequest(endpoint, method, params) {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method,
+          params,
+        }),
+      });
+      if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
+      const payload = await res.json();
+      if (payload?.error) throw new Error(payload.error?.message || "RPC error");
+      return payload.result;
+    }
+
+    async function rpcBatchGetTransactions(endpoint, signatures) {
+      const batchRequest = signatures.map((signature, idx) => ({
+        jsonrpc: "2.0",
+        id: idx + 1,
+        method: "getTransaction",
+        params: [signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }],
+      }));
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(batchRequest),
+      });
+      if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
+      const payload = await res.json();
+      if (!Array.isArray(payload)) throw new Error("Invalid batch transaction response");
+      return payload.map((entry) => entry?.result || null);
     }
 
     async function getTrollPrice() {
@@ -323,14 +408,155 @@ h1 {
       throw lastError || new Error("Unable to fetch balance from any Solana RPC endpoint");
     }
 
+    async function getWalletTransferSignatures() {
+      let before;
+      const signatures = [];
+      while (signatures.length < MAX_SIGNATURES) {
+        let page = null;
+        let pageError;
+        for (const endpoint of SOLANA_RPC_ENDPOINTS) {
+          try {
+            page = await rpcRequest(endpoint, "getSignaturesForAddress", [
+              TROLL_WALLET,
+              { limit: SIGNATURE_PAGE_SIZE, before },
+            ]);
+            break;
+          } catch (err) {
+            pageError = err;
+          }
+        }
+        if (!page) throw pageError || new Error("Unable to load signatures");
+        if (!page.length) break;
+        signatures.push(...page.map((entry) => entry.signature));
+        before = page[page.length - 1].signature;
+      }
+      return signatures.slice(0, MAX_SIGNATURES);
+    }
+
+    function getWalletTokenDelta(transaction) {
+      const preTokenBalances = transaction?.meta?.preTokenBalances || [];
+      const postTokenBalances = transaction?.meta?.postTokenBalances || [];
+
+      const relevantPre = preTokenBalances.filter((entry) => entry?.mint === TROLL_MINT && entry?.owner === TROLL_WALLET);
+      const relevantPost = postTokenBalances.filter((entry) => entry?.mint === TROLL_MINT && entry?.owner === TROLL_WALLET);
+
+      if (!relevantPre.length && !relevantPost.length) return 0;
+
+      const decimals = relevantPost[0]?.uiTokenAmount?.decimals ?? relevantPre[0]?.uiTokenAmount?.decimals ?? 0;
+      const preRaw = relevantPre.reduce((sum, entry) => sum + Number(entry?.uiTokenAmount?.amount || 0), 0);
+      const postRaw = relevantPost.reduce((sum, entry) => sum + Number(entry?.uiTokenAmount?.amount || 0), 0);
+      return (postRaw - preRaw) / Math.pow(10, decimals);
+    }
+
+    function getAccountKeys(transaction) {
+      const accountKeys = transaction?.transaction?.message?.accountKeys || [];
+      return accountKeys.map((entry) => (typeof entry === "string" ? entry : entry?.pubkey || ""));
+    }
+
+    function getTransferCounterparty(transaction, direction) {
+      const accountKeys = getAccountKeys(transaction);
+      const tokenBalanceEntries = [
+        ...(transaction?.meta?.preTokenBalances || []),
+        ...(transaction?.meta?.postTokenBalances || []),
+      ];
+
+      const tokenOwnerByTokenAccount = new Map();
+      tokenBalanceEntries.forEach((entry) => {
+        const tokenAccount = accountKeys[entry?.accountIndex];
+        if (tokenAccount && entry?.owner) tokenOwnerByTokenAccount.set(tokenAccount, entry.owner);
+      });
+
+      const instructions = transaction?.transaction?.message?.instructions || [];
+      for (const instruction of instructions) {
+        const parsed = instruction?.parsed;
+        const info = parsed?.info;
+        const type = parsed?.type;
+        if (!info || !["transfer", "transferChecked"].includes(type)) continue;
+        if (info?.mint && info.mint !== TROLL_MINT) continue;
+
+        const sourceOwner = tokenOwnerByTokenAccount.get(info.source) || info.authority || "";
+        const destinationOwner = tokenOwnerByTokenAccount.get(info.destination) || "";
+
+        if (direction === "IN" && destinationOwner === TROLL_WALLET) return sourceOwner || "Unknown";
+        if (direction === "OUT" && sourceOwner === TROLL_WALLET) return destinationOwner || "Unknown";
+      }
+
+      return "Unknown";
+    }
+
+    async function getWalletTransfers() {
+      const signatures = await getWalletTransferSignatures();
+      const transferCandidates = [];
+      const batchSize = 25;
+
+      for (let i = 0; i < signatures.length; i += batchSize) {
+        const batchSignatures = signatures.slice(i, i + batchSize);
+        let batch = null;
+        for (const endpoint of SOLANA_RPC_ENDPOINTS) {
+          try {
+            batch = await rpcBatchGetTransactions(endpoint, batchSignatures);
+            break;
+          } catch (err) {
+            console.warn(`Transaction batch failed on ${endpoint}`, err);
+          }
+        }
+        if (batch) {
+          batch.forEach((transaction, batchIndex) => {
+            transferCandidates.push({
+              signature: batchSignatures[batchIndex],
+              transaction,
+            });
+          });
+        }
+      }
+
+      return transferCandidates
+        .map(({ signature, transaction }) => {
+          if (!transaction || !signature) return null;
+          const amount = getWalletTokenDelta(transaction);
+          if (!amount) return null;
+          return {
+            signature,
+            unixTime: transaction.blockTime || 0,
+            amount,
+            transaction,
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.unixTime - a.unixTime);
+    }
+
+    function renderTransfers(transfers, trollUsd) {
+      const listEl = document.getElementById("transfer-list");
+      const noteEl = document.getElementById("transfer-note");
+      listEl.innerHTML = transfers.map((tx) => {
+        const direction = tx.amount >= 0 ? "IN" : "OUT";
+        const counterparty = getTransferCounterparty(tx.transaction, direction);
+        return `
+        <div class="transfer-item">
+          <div class="label">${direction} • ${fmtCompactDate(tx.unixTime)}</div>
+          <div class="${tx.amount < 0 ? "amount-out" : "amount-in"}">
+            ${tx.amount < 0 ? "" : "+"}${fmtTokenAmount(tx.amount)} TROLL
+          </div>
+          <div class="sub">$${fmtUsd(Math.abs(tx.amount) * trollUsd)}</div>
+          <div class="sub">Counterparty: ${counterparty}</div>
+          <a class="tx-hash" href="https://solscan.io/tx/${tx.signature}" target="_blank" rel="noopener noreferrer">${tx.signature.slice(0, 10)}...${tx.signature.slice(-6)}</a>
+        </div>
+      `;
+      }).join("");
+
+      noteEl.textContent = `Showing ${transfers.length} transfers to/from wallet ${TROLL_WALLET}.`;
+    }
+
     async function loadTrollStats() {
       const balanceEl = document.getElementById("troll-balance");
       const usdEl = document.getElementById("troll-usd");
       const marketLineEl = document.getElementById("market-line");
 
-      const [priceResult, balanceResult] = await Promise.allSettled([
+      const [priceResult, balanceResult, transfersResult] = await Promise.allSettled([
         getTrollPrice(),
         getTrollBalance(),
+        getWalletTransfers(),
       ]);
 
       const hasPrice = priceResult.status === "fulfilled";
@@ -346,10 +572,7 @@ h1 {
         const usdValue = balanceResult.value.amount * priceResult.value.trollUsd;
         usdEl.textContent = `$${fmtUsd(usdValue)}`;
         marketLineEl.textContent = `${priceResult.value.source} live: $TROLL $${fmtPrice(priceResult.value.trollUsd)} | Wallet via ${new URL(balanceResult.value.endpoint).hostname}`;
-        return;
-      }
-
-      if (hasPrice) {
+      } else if (hasPrice) {
         usdEl.textContent = "Waiting on wallet...";
         marketLineEl.textContent = `${priceResult.value.source} live: $TROLL $${fmtPrice(priceResult.value.trollUsd)} | Wallet RPC unavailable`;
       } else if (hasBalance) {
@@ -360,8 +583,16 @@ h1 {
         marketLineEl.textContent = "Market and wallet data unavailable.";
       }
 
+      if (transfersResult.status === "fulfilled") {
+        renderTransfers(transfersResult.value, hasPrice ? priceResult.value.trollUsd : 0);
+      } else {
+        document.getElementById("transfer-note").textContent = "Unable to load transfer history right now.";
+        document.getElementById("transfer-list").innerHTML = "<div class='transfer-item'>Transfer feed unavailable.</div>";
+      }
+
       if (priceResult.status === "rejected") console.error("Unable to load $TROLL price", priceResult.reason);
       if (balanceResult.status === "rejected") console.error("Unable to load $TROLL wallet balance", balanceResult.reason);
+      if (transfersResult.status === "rejected") console.error("Unable to load transfer history", transfersResult.reason);
     }
 
     loadTrollStats();
