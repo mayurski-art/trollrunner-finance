@@ -161,6 +161,75 @@ h1 {
 
 .card p { margin: 0; color: var(--muted); line-height: 1.5; font-size: 14px; }
 
+.transfers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.transfers-header h3 {
+  margin: 0;
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.transfers-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.transfer-list {
+  display: grid;
+  gap: 10px;
+}
+
+.transfer-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #08100a;
+}
+
+.transfer-meta {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.transfer-direction {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.transfer-in { color: #8cff9a; }
+.transfer-out { color: #ffb38a; }
+
+.transfer-title {
+  margin-top: 4px;
+  font-size: 14px;
+}
+
+.transfer-amount {
+  margin-top: 8px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.transfer-item a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.transfer-item a:hover {
+  text-decoration: underline;
+}
+
 .donation {
   margin-top: 14px;
   padding: 14px;
@@ -238,7 +307,15 @@ h1 {
       </section>
 
       <div class="grid">
-        <article class="card"><h3>Budget Dashboard</h3><p>Track monthly spend categories and compare against planned budgets.</p></article>
+        <article class="card">
+          <h3>Budget Dashboard</h3>
+          <p>Track monthly spend categories and compare against planned budgets.</p>
+          <div class="transfers-header" style="margin-top: 10px;">
+            <h3 style="font-size: 13px;">Recent $TROLL Transfers</h3>
+            <span class="transfers-note" id="transfer-status">Loading recent transfers...</span>
+          </div>
+          <div id="transfer-list" class="transfer-list"></div>
+        </article>
         <article class="card"><h3>Growth Planning</h3><p>Lay out future spend targets for scaling to new cities and drops.</p></article>
       </div>
     </section>
@@ -251,6 +328,10 @@ h1 {
       "https://api.mainnet-beta.solana.com",
       "https://rpc.ankr.com/solana",
     ];
+    const MAX_TRANSFER_ITEMS = 12;
+    const MAX_SIGNATURE_SCAN = 250;
+    let latestTrollUsd = null;
+    let cachedTransfers = [];
 
     function fmtTokenAmount(value) {
       return Number(value || 0).toLocaleString(undefined, {
@@ -282,6 +363,31 @@ h1 {
       const trollUsd = Number(json?.["troll-2"]?.usd || 0);
       if (!trollUsd) throw new Error("CoinGecko missing troll-2 USD price");
       return { trollUsd, source: "CoinGecko" };
+    }
+
+    async function rpcRequest(method, params) {
+      let lastError;
+      for (const endpoint of SOLANA_RPC_ENDPOINTS) {
+        try {
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              id: 1,
+              method,
+              params
+            }),
+          });
+          if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
+          const json = await res.json();
+          if (json?.error) throw new Error(`${endpoint} RPC error: ${json.error.message || "unknown"}`);
+          return json.result;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+      throw lastError || new Error(`Unable to run RPC method ${method}`);
     }
 
     async function getTrollBalanceFromEndpoint(endpoint) {
@@ -323,6 +429,142 @@ h1 {
       throw lastError || new Error("Unable to fetch balance from any Solana RPC endpoint");
     }
 
+    function shortenAddress(value) {
+      if (!value) return "Unknown";
+      return `${value.slice(0, 4)}...${value.slice(-4)}`;
+    }
+
+    async function resolveSolName(address) {
+      if (!address) return null;
+      try {
+        const res = await fetch(`https://sns-sdk-proxy.bonfida.workers.dev/reverse/${address}`);
+        if (!res.ok) return null;
+        const json = await res.json();
+        if (!json?.result) return null;
+        return json.result.endsWith(".sol") ? json.result : `${json.result}.sol`;
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function findTokenDelta(meta, ownerAddress) {
+      const entries = [];
+      for (const item of meta?.preTokenBalances || []) entries.push({ ...item, phase: "pre" });
+      for (const item of meta?.postTokenBalances || []) entries.push({ ...item, phase: "post" });
+      const byAccount = new Map();
+      for (const item of entries) {
+        if (item?.mint !== TROLL_MINT) continue;
+        if (item?.owner !== ownerAddress) continue;
+        const key = String(item.accountIndex);
+        if (!byAccount.has(key)) byAccount.set(key, { pre: 0, post: 0 });
+        const amount = Number(item?.uiTokenAmount?.uiAmount || 0);
+        byAccount.get(key)[item.phase] = amount;
+      }
+      let delta = 0;
+      for (const pair of byAccount.values()) delta += (pair.post - pair.pre);
+      return delta;
+    }
+
+    function findCounterparty(tx, direction) {
+      const instructions = [
+        ...(tx?.transaction?.message?.instructions || []),
+        ...((tx?.meta?.innerInstructions || []).flatMap((group) => group.instructions || [])),
+      ];
+      for (const instruction of instructions) {
+        const parsed = instruction?.parsed;
+        const type = parsed?.type;
+        const info = parsed?.info || {};
+        if (!parsed || (type !== "transfer" && type !== "transferChecked")) continue;
+        const source = info.source;
+        const destination = info.destination;
+        if (direction === "in" && destination === TROLL_WALLET) return source;
+        if (direction === "out" && source === TROLL_WALLET) return destination;
+      }
+      return null;
+    }
+
+    async function getRecentTrollTransfers() {
+      const signatures = [];
+      let before = null;
+      while (signatures.length < MAX_SIGNATURE_SCAN) {
+        const batch = await rpcRequest("getSignaturesForAddress", [
+          TROLL_WALLET,
+          { limit: 50, ...(before ? { before } : {}) }
+        ]);
+        if (!batch.length) break;
+        signatures.push(...batch);
+        before = batch[batch.length - 1].signature;
+        if (batch.length < 50) break;
+      }
+      const transferRows = [];
+      for (const item of signatures) {
+        if (!item?.signature) continue;
+        const tx = await rpcRequest("getTransaction", [
+          item.signature,
+          { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }
+        ]);
+        if (!tx?.meta || tx.meta.err) continue;
+        const delta = findTokenDelta(tx.meta, TROLL_WALLET);
+        if (!delta) continue;
+        const direction = delta > 0 ? "in" : "out";
+        const absoluteAmount = Math.abs(delta);
+        const counterparty = findCounterparty(tx, direction);
+        const name = await resolveSolName(counterparty);
+        transferRows.push({
+          signature: item.signature,
+          blockTime: item.blockTime || tx.blockTime || null,
+          direction,
+          amount: absoluteAmount,
+          counterparty: counterparty || "Unknown",
+          displayCounterparty: name || counterparty || "Unknown",
+        });
+        if (transferRows.length >= MAX_TRANSFER_ITEMS) break;
+      }
+
+      return transferRows.sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0));
+    }
+
+    function renderTransfers(transfers) {
+      const transferListEl = document.getElementById("transfer-list");
+      const transferStatusEl = document.getElementById("transfer-status");
+      if (!transfers.length) {
+        transferStatusEl.textContent = "No recent $TROLL transfers found.";
+        transferListEl.innerHTML = "<div class='transfer-item'>No $TROLL movements were detected in the recent transactions.</div>";
+        return;
+      }
+
+      transferStatusEl.textContent = `Showing ${transfers.length} most recent transfers (newest first)`;
+      transferListEl.innerHTML = transfers.map((tx) => {
+        const date = tx.blockTime ? new Date(tx.blockTime * 1000).toLocaleString() : "Unknown date";
+        const usdValue = latestTrollUsd ? tx.amount * latestTrollUsd : null;
+        const directionClass = tx.direction === "in" ? "transfer-in" : "transfer-out";
+        const directionLabel = tx.direction === "in" ? "Incoming to Fund Wallet" : "Outgoing from Fund Wallet";
+        const actorLabel = tx.direction === "in" ? "From" : "To";
+        return `
+          <article class="transfer-item">
+            <div class="transfer-direction ${directionClass}">${directionLabel}</div>
+            <div class="transfer-title">${actorLabel}: <strong>${tx.displayCounterparty}</strong> <span class="transfers-note">(${shortenAddress(tx.counterparty)})</span></div>
+            <div class="transfer-amount">${fmtTokenAmount(tx.amount)} TROLL ${usdValue === null ? "(USD pending)" : `(~$${fmtUsd(usdValue)} at current price)`}</div>
+            <div class="transfer-meta">Date: ${date}<br>Signature: <a href="https://solscan.io/tx/${tx.signature}" target="_blank" rel="noopener noreferrer">${shortenAddress(tx.signature)}</a></div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    async function loadTransfers() {
+      const transferStatusEl = document.getElementById("transfer-status");
+      try {
+        if (!cachedTransfers.length) {
+          cachedTransfers = await getRecentTrollTransfers();
+        }
+        renderTransfers(cachedTransfers);
+      } catch (err) {
+        console.error("Unable to load transfer feed", err);
+        transferStatusEl.textContent = "Transfer feed unavailable right now.";
+        document.getElementById("transfer-list").innerHTML = "<div class='transfer-item'>Could not fetch recent transfers from Solana RPC.</div>";
+      }
+    }
+
     async function loadTrollStats() {
       const balanceEl = document.getElementById("troll-balance");
       const usdEl = document.getElementById("troll-usd");
@@ -343,6 +585,7 @@ h1 {
       }
 
       if (hasPrice && hasBalance) {
+        latestTrollUsd = priceResult.value.trollUsd;
         const usdValue = balanceResult.value.amount * priceResult.value.trollUsd;
         usdEl.textContent = `$${fmtUsd(usdValue)}`;
         marketLineEl.textContent = `${priceResult.value.source} live: $TROLL $${fmtPrice(priceResult.value.trollUsd)} | Wallet via ${new URL(balanceResult.value.endpoint).hostname}`;
@@ -350,6 +593,7 @@ h1 {
       }
 
       if (hasPrice) {
+        latestTrollUsd = priceResult.value.trollUsd;
         usdEl.textContent = "Waiting on wallet...";
         marketLineEl.textContent = `${priceResult.value.source} live: $TROLL $${fmtPrice(priceResult.value.trollUsd)} | Wallet RPC unavailable`;
       } else if (hasBalance) {
@@ -364,7 +608,10 @@ h1 {
       if (balanceResult.status === "rejected") console.error("Unable to load $TROLL wallet balance", balanceResult.reason);
     }
 
-    loadTrollStats();
+    Promise.allSettled([loadTrollStats(), loadTransfers()]).then(() => {
+      // If price resolved after transfers rendered, refresh USD estimations.
+      if (latestTrollUsd) loadTransfers();
+    });
   </script>
 </body>
 </html>
