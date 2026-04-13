@@ -381,7 +381,13 @@ h1 {
         const params = fullHistory
           ? [address, { limit: 1000, ...(before ? { before } : {}) }]
           : [address, { limit: 30 }];
-        const page = await rpcCall(endpoint, "getSignaturesForAddress", params);
+        let page;
+        try {
+          page = await rpcCall(endpoint, "getSignaturesForAddress", params);
+        } catch (err) {
+          console.warn(`Signature fetch failed for ${address}`, err);
+          break;
+        }
         if (!page?.length) break;
         all.push(...page);
         if (!fullHistory || page.length < 1000) break;
@@ -405,10 +411,16 @@ h1 {
 
       const events = [];
       for (const sigInfo of signatureMap.values()) {
-        const tx = await rpcCall(endpoint, "getTransaction", [
-          sigInfo.signature,
-          { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 },
-        ]);
+        let tx;
+        try {
+          tx = await rpcCall(endpoint, "getTransaction", [
+            sigInfo.signature,
+            { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 },
+          ]);
+        } catch (err) {
+          console.warn(`Transaction fetch failed for ${sigInfo.signature}`, err);
+          continue;
+        }
         const event = extractTokenEventFromTransaction(tx);
         if (!event) continue;
         events.push({ ...event, blockTime: tx?.blockTime || sigInfo?.blockTime || null });
@@ -475,6 +487,16 @@ h1 {
       while (toastWrap.children.length > 4) toastWrap.removeChild(toastWrap.lastElementChild);
     }
 
+    function ensureFeedPlaceholder(message) {
+      const feed = document.getElementById("tx-feed");
+      if (!feed) return;
+      if (feed.children.length > 0) return;
+      const placeholder = document.createElement("div");
+      placeholder.className = "tx-item";
+      placeholder.textContent = message;
+      feed.appendChild(placeholder);
+    }
+
     async function loadTrollStats() {
       if (loadingStats) return;
       loadingStats = true;
@@ -531,6 +553,7 @@ h1 {
               addTransactionCard({ tokenDelta: event.tokenDelta, usdValue, priceUsd: priceResult.value.trollUsd, timeLabel, direction: event.direction });
             });
             historyLoaded = true;
+            ensureFeedPlaceholder("No historical TROLL transfer events found.");
           } else {
             ordered.forEach((event) => {
               if (!event.signature || seenIncomingSignatures.has(event.signature)) return;
@@ -542,6 +565,9 @@ h1 {
             });
           }
         }
+      } catch (err) {
+        console.error("Unable to process TROLL transaction feed", err);
+        ensureFeedPlaceholder("Transaction feed unavailable right now. Retrying...");
       } finally {
         loadingStats = false;
       }
