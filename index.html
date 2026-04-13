@@ -4,7 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Troll Runner Finance</title>
-
+<script>
+if (window.location.hostname === 'trollrunner.net' || window.location.hostname === 'www.trollrunner.net') {
+  window.location.replace('https://finance.trollrunner.net');
+}
+</script>
 <style>
 :root {
   --bg: #050806;
@@ -16,311 +20,351 @@
   --accent: #7eff8e;
   --accent-soft: rgba(126, 255, 142, 0.15);
 }
-
 * { box-sizing: border-box; }
-
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: monospace;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   color: var(--text);
   background:
-    radial-gradient(circle at 20% 10%, rgba(126,255,142,0.12), transparent 40%),
-    radial-gradient(circle at 80% 0%, rgba(94,176,255,0.08), transparent 35%),
-    linear-gradient(180deg, #070b08, #030503);
+    radial-gradient(circle at 20% 10%, rgba(126, 255, 142, 0.12), transparent 40%),
+    radial-gradient(circle at 80% 0%, rgba(94, 176, 255, 0.08), transparent 35%),
+    linear-gradient(180deg, #070b08, #030503 55%);
+}
+
+.scanlines::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(126, 255, 142, 0.025) 0px,
+    rgba(126, 255, 142, 0.025) 1px,
+    transparent 1px,
+    transparent 3px
+  );
 }
 
 .wrap {
   max-width: 1040px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 26px 18px 56px;
 }
 
 .top {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:14px;
-  border:1px solid var(--line);
-  border-radius:10px;
-  background:rgba(126,255,142,0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(126, 255, 142, 0.06), rgba(126, 255, 142, 0.02));
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4) inset;
 }
 
+.brand { letter-spacing: 0.04em; font-weight: 700; }
+
+.pills { display: flex; gap: 8px; flex-wrap: wrap; }
 .pill {
-  padding:6px 10px;
-  border:1px solid var(--line);
-  border-radius:999px;
-  color:var(--text);
-  text-decoration:none;
-  font-size:12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 12px;
+  background: var(--panel-soft);
 }
+.pill:hover { background: var(--accent-soft); }
 
 .hero {
-  margin-top:20px;
-  padding:20px;
-  border:1px solid var(--line);
-  border-radius:10px;
-  background:rgba(10,20,13,0.6);
+  margin-top: 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 22px;
+  background: linear-gradient(180deg, rgba(18, 29, 21, 0.8), rgba(7, 11, 8, 0.9));
+}
+
+h1 {
+  margin: 0 0 6px;
+  font-size: 32px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
 }
 
 .stats {
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:10px;
-  margin-top:15px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
 }
 
 .stat {
-  padding:12px;
-  border:1px solid var(--line);
-  border-radius:10px;
-  background:var(--panel);
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
 }
 
+.label {
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.07em;
+}
 .value {
-  font-size:22px;
-  color:var(--accent);
+  margin-top: 8px;
+  font-size: 26px;
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(126, 255, 142, 0.5);
+}
+
+.terminal {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 10px;
+  background: #030603;
+  border: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+  white-space: pre-wrap;
 }
 
 .grid {
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:12px;
-  margin-top:15px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
 }
 
 .card {
-  border:1px solid var(--line);
-  border-radius:10px;
-  padding:12px;
-  background:var(--panel);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
 }
 
-.tx-feed {
-  margin-top:10px;
-  display:grid;
-  gap:8px;
+.card h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.tx-item {
-  border:1px solid var(--line);
-  border-radius:8px;
-  padding:10px;
-  background:rgba(126,255,142,0.08);
-  font-size:12px;
+.card p { margin: 0; color: var(--muted); line-height: 1.5; font-size: 14px; }
+
+.donation {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(126, 255, 142, 0.08), rgba(126, 255, 142, 0.03));
+  border: 1px solid var(--line);
 }
 
-.tx-title {
-  font-size:11px;
-  color:var(--accent);
-  margin-bottom:4px;
-  text-transform:uppercase;
+.donation h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.tx-toasts {
-  position:fixed;
-  top:10px;
-  right:10px;
-  display:grid;
-  gap:8px;
-  width:300px;
-}
-
-.tx-toast {
-  padding:10px;
-  border:1px solid var(--line);
-  border-radius:10px;
-  background:#06110a;
-  font-size:12px;
+.donation p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: 14px;
 }
 
 .wallet {
-  font-size:12px;
-  padding:10px;
-  border:1px dashed var(--line);
-  margin-top:8px;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #030603;
+  border: 1px dashed var(--line);
+  color: var(--text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 860px) {
+  .stats, .grid { grid-template-columns: 1fr; }
+  h1 { font-size: 28px; }
 }
 </style>
 </head>
-
-<body>
-<div class="wrap">
-
-  <div class="top">
-    <strong>TROLLRUNNER.FINANCE</strong>
-    <div style="display:flex; gap:8px;">
-      <a class="pill" href="#">Blog</a>
-      <a class="pill" href="#">Main</a>
+<body class="scanlines">
+  <div class="wrap">
+    <div class="top">
+      <strong class="brand">💰 TROLLRUNNER.FINANCE</strong>
+      <nav class="pills" aria-label="Section links">
+        <a class="pill" href="https://blog.trollrunner.net">Blog</a>
+        <a class="pill" href="https://nutrition.trollrunner.net">Nutrition</a>
+        <a class="pill" href="https://trollrunner.net">Main Site</a>
+      </nav>
     </div>
+
+    <section class="hero">
+      <h1>Treasury Console</h1>
+      <p class="sub" id="market-line">Loading market data...</p>
+
+      <div class="stats">
+        <article class="stat">
+          <div class="label">$TROLL Balance</div>
+          <div id="troll-balance" class="value">Loading...</div>
+        </article>
+        <article class="stat">
+          <div class="label">USD Value</div>
+          <div id="troll-usd" class="value">Loading...</div>
+        </article>
+        <article class="stat">
+          <div class="label">System Status</div>
+          <div class="value">Trolling</div>
+        </article>
+      </div>
+
+            <section class="donation" aria-label="Troll Fund wallet">
+        <h2>Troll Fund Wallet</h2>
+        <div class="wallet">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</div>
+        <p style="margin-top:10px; color: var(--muted); font-size: 13px;">
+          Conversion rate: $6.90 = 1 mile ran = 1 sticker</p>
+      </section>
+
+      <div class="grid">
+        <article class="card"><h3>Budget Dashboard</h3><p>Track monthly spend categories and compare against planned budgets.</p></article>
+        <article class="card"><h3>Growth Planning</h3><p>Lay out future spend targets for scaling to new cities and drops.</p></article>
+      </div>
+    </section>
   </div>
+  <script>
+    const TROLL_WALLET = "79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA";
+    const TROLL_MINT = "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2";
+    const SOLANA_RPC_ENDPOINTS = [
+      "https://solana-rpc.publicnode.com",
+      "https://api.mainnet-beta.solana.com",
+      "https://rpc.ankr.com/solana",
+    ];
 
-  <div class="hero">
-    <h2>Treasury Console</h2>
-    <div id="market-line">Loading...</div>
+    function fmtTokenAmount(value) {
+      return Number(value || 0).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
 
-    <div class="stats">
-      <div class="stat">
-        <div>$TROLL Balance</div>
-        <div class="value" id="balance">...</div>
-      </div>
-      <div class="stat">
-        <div>USD Value</div>
-        <div class="value" id="usd">...</div>
-      </div>
-      <div class="stat">
-        <div>Status</div>
-        <div class="value">Live</div>
-      </div>
-    </div>
+    function fmtUsd(value) {
+      return Number(value || 0).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
 
-    <div class="card" style="margin-top:12px;">
-      <h3>Wallet</h3>
-      <div class="wallet">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</div>
-    </div>
+    function fmtPrice(value) {
+      const numeric = Number(value || 0);
+      const fractionDigits = numeric > 0 && numeric < 0.01 ? 8 : 4;
+      return numeric.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: fractionDigits,
+      });
+    }
 
-    <div class="grid">
-      <div class="card">
-        <h3>Budget Dashboard</h3>
-        <div id="tx-feed" class="tx-feed"></div>
-      </div>
-      <div class="card"><h3>Campaign Costs</h3></div>
-      <div class="card"><h3>Growth</h3></div>
-    </div>
+    async function getTrollPrice() {
+      const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=troll-2&vs_currencies=usd");
+      if (!res.ok) throw new Error(`CoinGecko API error (${res.status})`);
+      const json = await res.json();
+      const trollUsd = Number(json?.["troll-2"]?.usd || 0);
+      if (!trollUsd) throw new Error("CoinGecko missing troll-2 USD price");
+      return { trollUsd, source: "CoinGecko" };
+    }
 
-  </div>
-</div>
+    async function getTrollBalanceFromEndpoint(endpoint) {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "getTokenAccountsByOwner",
+          params: [
+            TROLL_WALLET,
+            { mint: TROLL_MINT },
+            { encoding: "jsonParsed" }
+          ]
+        }),
+      });
+      if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
+      const json = await res.json();
+      if (json?.error) throw new Error(`${endpoint} RPC error: ${json.error.message || "unknown"}`);
+      const accounts = json?.result?.value || [];
+      const amount = accounts.reduce((sum, account) => {
+        const tokenAmount = Number(account?.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
+        return sum + tokenAmount;
+      }, 0);
+      return { amount, endpoint };
+    }
 
-<div id="tx-toasts" class="tx-toasts"></div>
-
-<script>
-const WALLET = "79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA";
-const MINT = "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2";
-
-const RPCS = [
-  "https://solana-rpc.publicnode.com",
-  "https://api.mainnet-beta.solana.com"
-];
-
-let seen = new Set();
-let loading = false;
-
-function fmt(n){return Number(n||0).toLocaleString();}
-
-async function rpc(url, method, params){
-  const r = await fetch(url,{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({jsonrpc:"2.0",id:1,method,params})
-  });
-  const j = await r.json();
-  return j.result;
-}
-
-async function getPrice(){
-  const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=troll-2&vs_currencies=usd");
-  const j = await r.json();
-  return j["troll-2"].usd;
-}
-
-function getDelta(tx){
-  const meta = tx?.meta;
-  if(!meta) return null;
-
-  const pre = meta.preTokenBalances || [];
-  const post = meta.postTokenBalances || [];
-
-  function bal(arr){
-    return arr.filter(x=>x.mint===MINT && x.owner===WALLET)
-      .reduce((a,b)=>a+(b.uiTokenAmount?.uiAmount||0),0);
-  }
-
-  const d = bal(post)-bal(pre);
-  if(d===0) return null;
-
-  return {
-    delta:d,
-    sig:tx.transaction.signatures[0],
-    time:tx.blockTime
-  };
-}
-
-async function getTxs(){
-  for(const r of RPCS){
-    try{
-      const sigs = await rpc(r,"getSignaturesForAddress",[WALLET,{limit:20}]);
-      const out=[];
-
-      for(const s of sigs){
-        const tx = await rpc(r,"getTransaction",[s.signature,{encoding:"jsonParsed"}]);
-        const ev = getDelta(tx);
-        if(ev) out.push(ev);
+    async function getTrollBalance() {
+      let lastError;
+      for (const endpoint of SOLANA_RPC_ENDPOINTS) {
+        try {
+          return await getTrollBalanceFromEndpoint(endpoint);
+        } catch (err) {
+          lastError = err;
+          console.warn(`Balance fetch failed on ${endpoint}`, err);
+        }
       }
-      return out;
-    }catch(e){}
-  }
-  return [];
-}
+      throw lastError || new Error("Unable to fetch balance from any Solana RPC endpoint");
+    }
 
-function add(tx,price){
-  const feed=document.getElementById("tx-feed");
+    async function loadTrollStats() {
+      const balanceEl = document.getElementById("troll-balance");
+      const usdEl = document.getElementById("troll-usd");
+      const marketLineEl = document.getElementById("market-line");
 
-  const el=document.createElement("div");
-  el.className="tx-item";
+      const [priceResult, balanceResult] = await Promise.allSettled([
+        getTrollPrice(),
+        getTrollBalance(),
+      ]);
 
-  const usd=Math.abs(tx.delta)*price;
+      const hasPrice = priceResult.status === "fulfilled";
+      const hasBalance = balanceResult.status === "fulfilled";
 
-  el.innerHTML=`
-    <div class="tx-title">${tx.delta>0?"IN":"OUT"} · ${new Date(tx.time*1000).toLocaleString()}</div>
-    <div>${tx.delta>0?"+":""}${fmt(tx.delta)} TROLL</div>
-    <div>$${usd.toFixed(2)}</div>
-  `;
+      if (hasBalance) {
+        balanceEl.textContent = `${fmtTokenAmount(balanceResult.value.amount)} TROLL`;
+      } else {
+        balanceEl.textContent = "Unavailable";
+      }
 
-  feed.prepend(el);
+      if (hasPrice && hasBalance) {
+        const usdValue = balanceResult.value.amount * priceResult.value.trollUsd;
+        usdEl.textContent = `$${fmtUsd(usdValue)}`;
+        marketLineEl.textContent = `${priceResult.value.source} live: $TROLL $${fmtPrice(priceResult.value.trollUsd)} | Wallet via ${new URL(balanceResult.value.endpoint).hostname}`;
+        return;
+      }
 
-  if(!seen.has(tx.sig)){
-    seen.add(tx.sig);
-    toast(tx,usd,price);
-  }
-}
+      if (hasPrice) {
+        usdEl.textContent = "Waiting on wallet...";
+        marketLineEl.textContent = `${priceResult.value.source} live: $TROLL $${fmtPrice(priceResult.value.trollUsd)} | Wallet RPC unavailable`;
+      } else if (hasBalance) {
+        usdEl.textContent = "Waiting on price...";
+        marketLineEl.textContent = `Wallet loaded (${new URL(balanceResult.value.endpoint).hostname}) | CoinGecko unavailable`;
+      } else {
+        usdEl.textContent = "Unavailable";
+        marketLineEl.textContent = "Market and wallet data unavailable.";
+      }
 
-function toast(tx,usd,price){
-  const wrap=document.getElementById("tx-toasts");
-  const el=document.createElement("div");
-  el.className="tx-toast";
-  el.textContent=`${tx.delta>0?"IN":"OUT"} ${fmt(tx.delta)} ($${usd.toFixed(2)})`;
-  wrap.prepend(el);
-  setTimeout(()=>el.remove(),6000);
-}
+      if (priceResult.status === "rejected") console.error("Unable to load $TROLL price", priceResult.reason);
+      if (balanceResult.status === "rejected") console.error("Unable to load $TROLL wallet balance", balanceResult.reason);
+    }
 
-async function load(){
-  if(loading) return;
-  loading=true;
-
-  try{
-    const price=await getPrice();
-    const txs=await getTxs();
-
-    document.getElementById("market-line").textContent="Live price loaded";
-    document.getElementById("balance").textContent="Loaded";
-
-    let total=0;
-    txs.forEach(t=>{
-      total+=t.delta;
-      add(t,price);
-    });
-
-    document.getElementById("usd").textContent="$"+(total*price).toFixed(2);
-
-  }catch(e){
-    console.log(e);
-  }
-
-  loading=false;
-}
-
-load();
-setInterval(load,30000);
-</script>
-
+    loadTrollStats();
+  </script>
 </body>
 </html>
