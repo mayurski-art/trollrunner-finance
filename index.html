@@ -288,7 +288,7 @@ h1 {
       </section>
 
       <div class="grid">
-        <article class="card"><h3>Budget Dashboard</h3><p>Live buy notifications appear below from recent wallet transactions (auto-refresh every 30s).</p><div id="tx-feed" class="tx-feed" aria-live="polite"></div></article>
+        <article class="card"><h3>Budget Dashboard</h3><p>Live incoming TROLL activity appears below (buys + transfers, auto-refresh every 30s).</p><div id="tx-feed" class="tx-feed" aria-live="polite"></div></article>
         <article class="card"><h3>Campaign Costs</h3><p>Summarize route, print, and logistics costs for each sticker mission.</p></article>
         <article class="card"><h3>Growth Planning</h3><p>Lay out future spend targets for scaling to new cities and drops.</p></article>
       </div>
@@ -309,7 +309,7 @@ h1 {
     let totalUsdSpent = 0;
     let loadingStats = false;
     let historyLoaded = false;
-    const seenBuySignatures = new Set();
+    const seenIncomingSignatures = new Set();
 
     function fmtTokenAmount(value) {
       return Number(value || 0).toLocaleString(undefined, {
@@ -361,7 +361,7 @@ h1 {
         .reduce((sum, entry) => sum + Number(entry?.uiTokenAmount?.uiAmount || 0), 0);
     }
 
-    function extractBuyFromTransaction(tx) {
+    function extractIncomingFromTransaction(tx) {
       const meta = tx?.meta;
       if (!meta) return null;
       const pre = tokenAmountForWallet(meta.preTokenBalances);
@@ -374,23 +374,32 @@ h1 {
       };
     }
 
-    async function fetchRecentBuyEvents(endpoint, maxSignatures = 12) {
-      const signatures = await rpcCall(endpoint, "getSignaturesForAddress", [
-        TROLL_WALLET,
-        { limit: maxSignatures },
-      ]);
-      const buys = [];
-      for (const sigInfo of signatures || []) {
-        if (!sigInfo?.signature) continue;
+    async function fetchRecentIncomingEvents(endpoint, addresses, maxSignatures = 12) {
+      const signatureMap = new Map();
+
+      for (const address of addresses) {
+        const signatures = await rpcCall(endpoint, "getSignaturesForAddress", [
+          address,
+          { limit: maxSignatures },
+        ]);
+        for (const sigInfo of signatures || []) {
+          if (!sigInfo?.signature) continue;
+          signatureMap.set(sigInfo.signature, sigInfo);
+        }
+      }
+
+      const incoming = [];
+      for (const sigInfo of signatureMap.values()) {
         const tx = await rpcCall(endpoint, "getTransaction", [
           sigInfo.signature,
           { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 },
         ]);
-        const buy = extractBuyFromTransaction(tx);
-        if (!buy) continue;
-        buys.push({ ...buy, blockTime: tx?.blockTime || sigInfo?.blockTime || null });
+        const event = extractIncomingFromTransaction(tx);
+        if (!event) continue;
+        incoming.push({ ...event, blockTime: tx?.blockTime || sigInfo?.blockTime || null });
       }
-      return buys;
+
+      return incoming;
     }
 
     async function getTrollBalanceFromEndpoint(endpoint) {
@@ -404,7 +413,8 @@ h1 {
         const tokenAmount = Number(account?.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
         return sum + tokenAmount;
       }, 0);
-      return { amount, endpoint };
+      const tokenAccountAddresses = accounts.map((account) => account?.pubkey).filter(Boolean);
+      return { amount, endpoint, tokenAccountAddresses };
     }
 
     async function getTrollBalance() {
@@ -427,9 +437,9 @@ h1 {
       const card = document.createElement("div");
       card.className = "tx-item";
       card.innerHTML = `
-        <div class="tx-title">Buy detected · ${timeLabel}</div>
+        <div class="tx-title">Incoming TROLL · ${timeLabel}</div>
         <div>+${fmtTokenAmount(amountBought)} TROLL</div>
-        <div>USD cost: $${fmtUsd(usdCost)}</div>
+        <div>Est. USD value: $${fmtUsd(usdCost)}</div>
         <div>Avg cost: $${fmtPrice(avgCostUsd)} / TROLL</div>
       `;
       feed.prepend(card);
@@ -442,9 +452,9 @@ h1 {
       const toast = document.createElement("div");
       toast.className = "tx-toast";
       toast.innerHTML = `
-        <div class="tx-title">New TROLL buy</div>
+        <div class="tx-title">New TROLL incoming</div>
         <div>+${fmtTokenAmount(amountBought)} TROLL</div>
-        <div>$${fmtUsd(usdCost)} spent · avg $${fmtPrice(avgCostUsd)}</div>
+        <div>$${fmtUsd(usdCost)} est. value · avg $${fmtPrice(avgCostUsd)}</div>
       `;
       toastWrap.prepend(toast);
       setTimeout(() => toast.remove(), 8000);
@@ -487,6 +497,44 @@ h1 {
       } else {
         usdEl.textContent = "Unavailable";
         marketLineEl.textContent = "Market and wallet data unavailable.";
+      }
+
+      if (priceResult.status === "rejected") console.error("Unable to load $TROLL price", priceResult.reason);
+      if (balanceResult.status === "rejected") console.error("Unable to load $TROLL wallet balance", balanceResult.reason);
+
+        if (hasBalance && hasPrice) {
+          const endpoint = balanceResult.value.endpoint;
+          const watchAddresses = [TROLL_WALLET, ...(balanceResult.value.tokenAccountAddresses || [])];
+          const recentIncoming = await fetchRecentIncomingEvents(endpoint, watchAddresses, 10);
+          const ordered = recentIncoming.sort((a, b) => (a.blockTime || 0) - (b.blockTime || 0));
+
+          if (!historyLoaded) {
+            ordered.slice(-5).forEach((event) => {
+              seenIncomingSignatures.add(event.signature);
+              const usdCost = event.amountBought * priceResult.value.trollUsd;
+              totalBought += event.amountBought;
+              totalUsdSpent += usdCost;
+              const avgCostUsd = totalBought ? (totalUsdSpent / totalBought) : priceResult.value.trollUsd;
+              const timeLabel = event.blockTime ? new Date(event.blockTime * 1000).toLocaleTimeString() : "recent";
+              addTransactionCard({ amountBought: event.amountBought, usdCost, avgCostUsd, timeLabel });
+            });
+            historyLoaded = true;
+          } else {
+            ordered.forEach((event) => {
+              if (!event.signature || seenIncomingSignatures.has(event.signature)) return;
+              seenIncomingSignatures.add(event.signature);
+              const usdCost = event.amountBought * priceResult.value.trollUsd;
+              totalBought += event.amountBought;
+              totalUsdSpent += usdCost;
+              const avgCostUsd = totalBought ? (totalUsdSpent / totalBought) : priceResult.value.trollUsd;
+              const timeLabel = event.blockTime ? new Date(event.blockTime * 1000).toLocaleTimeString() : new Date().toLocaleTimeString();
+              addTransactionCard({ amountBought: event.amountBought, usdCost, avgCostUsd, timeLabel });
+              showTransactionToast({ amountBought: event.amountBought, usdCost, avgCostUsd });
+            });
+          }
+        }
+      } finally {
+        loadingStats = false;
       }
 
       if (priceResult.status === "rejected") console.error("Unable to load $TROLL price", priceResult.reason);
