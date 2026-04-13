@@ -166,65 +166,23 @@ h1 {
   gap: 12px;
 }
 
-.transfer-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.summary-box {
-  background: #09110b;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 10px;
-}
-
-.summary-box .label { font-size: 10px; }
-.summary-box .value {
-  margin-top: 6px;
-  font-size: 18px;
-}
-
-.mini-month-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.month-box {
-  background: #070d08;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px;
-}
-
-.month-box .label {
-  font-size: 10px;
-}
-
-.month-box .value {
-  margin-top: 4px;
-  font-size: 14px;
-}
-
 .transfer-list {
-  max-height: 260px;
+  max-height: 360px;
   overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #040805;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .transfer-item {
   display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 10px;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(126, 255, 142, 0.15);
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(126, 255, 142, 0.25);
+  border-radius: 8px;
+  background: #040805;
   font-size: 12px;
 }
-
-.transfer-item:last-child { border-bottom: 0; }
 .tx-hash { color: var(--muted); text-decoration: none; }
 .tx-hash:hover { color: var(--accent); }
 .amount-out { color: #ff8f8f; }
@@ -270,8 +228,7 @@ h1 {
 
 @media (max-width: 860px) {
   .stats, .grid { grid-template-columns: 1fr; }
-  .transfer-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .mini-month-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .transfer-list { grid-template-columns: 1fr; }
   h1 { font-size: 28px; }
 }
 </style>
@@ -317,8 +274,6 @@ h1 {
         <article class="card">
           <h3>Budget Dashboard</h3>
           <div class="budget-board">
-            <div id="transfer-summary" class="transfer-summary-grid"></div>
-            <div id="monthly-grid" class="mini-month-grid"></div>
             <p class="budget-note" id="transfer-note">Loading wallet transfer history...</p>
             <div id="transfer-list" class="transfer-list"></div>
           </div>
@@ -493,6 +448,42 @@ h1 {
       return (postRaw - preRaw) / Math.pow(10, decimals);
     }
 
+    function getAccountKeys(transaction) {
+      const accountKeys = transaction?.transaction?.message?.accountKeys || [];
+      return accountKeys.map((entry) => (typeof entry === "string" ? entry : entry?.pubkey || ""));
+    }
+
+    function getTransferCounterparty(transaction, direction) {
+      const accountKeys = getAccountKeys(transaction);
+      const tokenBalanceEntries = [
+        ...(transaction?.meta?.preTokenBalances || []),
+        ...(transaction?.meta?.postTokenBalances || []),
+      ];
+
+      const tokenOwnerByTokenAccount = new Map();
+      tokenBalanceEntries.forEach((entry) => {
+        const tokenAccount = accountKeys[entry?.accountIndex];
+        if (tokenAccount && entry?.owner) tokenOwnerByTokenAccount.set(tokenAccount, entry.owner);
+      });
+
+      const instructions = transaction?.transaction?.message?.instructions || [];
+      for (const instruction of instructions) {
+        const parsed = instruction?.parsed;
+        const info = parsed?.info;
+        const type = parsed?.type;
+        if (!info || !["transfer", "transferChecked"].includes(type)) continue;
+        if (info?.mint && info.mint !== TROLL_MINT) continue;
+
+        const sourceOwner = tokenOwnerByTokenAccount.get(info.source) || info.authority || "";
+        const destinationOwner = tokenOwnerByTokenAccount.get(info.destination) || "";
+
+        if (direction === "IN" && destinationOwner === TROLL_WALLET) return sourceOwner || "Unknown";
+        if (direction === "OUT" && sourceOwner === TROLL_WALLET) return destinationOwner || "Unknown";
+      }
+
+      return "Unknown";
+    }
+
     async function getWalletTransfers() {
       const signatures = await getWalletTransferSignatures();
       const transferCandidates = [];
@@ -528,6 +519,7 @@ h1 {
             signature,
             unixTime: transaction.blockTime || 0,
             amount,
+            transaction,
           };
         })
         .filter(Boolean)
@@ -535,68 +527,25 @@ h1 {
     }
 
     function renderTransfers(transfers, trollUsd) {
-      const summaryEl = document.getElementById("transfer-summary");
-      const monthlyEl = document.getElementById("monthly-grid");
       const listEl = document.getElementById("transfer-list");
       const noteEl = document.getElementById("transfer-note");
-
-      const incoming = transfers.filter((t) => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
-      const outgoing = Math.abs(transfers.filter((t) => t.amount < 0).reduce((sum, t) => sum + t.amount, 0));
-      const net = incoming - outgoing;
-      const sixMonthsAgo = Date.now() - (180 * 24 * 60 * 60 * 1000);
-      const sixMonthVolume = transfers
-        .filter((t) => (t.unixTime * 1000) >= sixMonthsAgo)
-        .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-      const summaryBoxes = [
-        ["All-time In", `${fmtTokenAmount(incoming)} TROLL`, `$${fmtUsd(incoming * trollUsd)}`],
-        ["All-time Out", `${fmtTokenAmount(outgoing)} TROLL`, `$${fmtUsd(outgoing * trollUsd)}`],
-        ["Net Flow", `${fmtTokenAmount(net)} TROLL`, `$${fmtUsd(net * trollUsd)}`],
-        ["6M Volume", `${fmtTokenAmount(sixMonthVolume)} TROLL`, `$${fmtUsd(sixMonthVolume * trollUsd)}`],
-      ];
-
-      summaryEl.innerHTML = summaryBoxes.map(([label, primary, secondary]) => `
-        <div class="summary-box">
-          <div class="label">${label}</div>
-          <div class="value">${primary}</div>
-          <div class="sub">${secondary}</div>
-        </div>
-      `).join("");
-
-      const monthlyRollup = new Map();
-      transfers.forEach((tx) => {
-        const date = new Date(tx.unixTime * 1000);
-        const key = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-        const prev = monthlyRollup.get(key) || { volume: 0, net: 0 };
-        prev.volume += Math.abs(tx.amount);
-        prev.net += tx.amount;
-        monthlyRollup.set(key, prev);
-      });
-
-      const recentMonths = Array.from(monthlyRollup.entries())
-        .sort((a, b) => b[0].localeCompare(a[0]))
-        .slice(0, 6);
-
-      monthlyEl.innerHTML = recentMonths.map(([month, values]) => `
-        <div class="month-box">
-          <div class="label">${month}</div>
-          <div class="value">${fmtTokenAmount(values.volume)}</div>
-          <div class="sub">${values.net >= 0 ? "+" : ""}${fmtTokenAmount(values.net)} TROLL</div>
-        </div>
-      `).join("");
-
-      listEl.innerHTML = transfers.map((tx) => `
+      listEl.innerHTML = transfers.map((tx) => {
+        const direction = tx.amount >= 0 ? "IN" : "OUT";
+        const counterparty = getTransferCounterparty(tx.transaction, direction);
+        return `
         <div class="transfer-item">
-          <a class="tx-hash" href="https://solscan.io/tx/${tx.signature}" target="_blank" rel="noopener noreferrer">${tx.signature.slice(0, 10)}...${tx.signature.slice(-6)}</a>
-          <div>${fmtCompactDate(tx.unixTime)}</div>
+          <div class="label">${direction} • ${fmtCompactDate(tx.unixTime)}</div>
           <div class="${tx.amount < 0 ? "amount-out" : "amount-in"}">
             ${tx.amount < 0 ? "" : "+"}${fmtTokenAmount(tx.amount)} TROLL
-            <br/>$${fmtUsd(tx.amount * trollUsd)}
           </div>
+          <div class="sub">$${fmtUsd(Math.abs(tx.amount) * trollUsd)}</div>
+          <div class="sub">Counterparty: ${counterparty}</div>
+          <a class="tx-hash" href="https://solscan.io/tx/${tx.signature}" target="_blank" rel="noopener noreferrer">${tx.signature.slice(0, 10)}...${tx.signature.slice(-6)}</a>
         </div>
-      `).join("");
+      `;
+      }).join("");
 
-      noteEl.textContent = `Loaded ${transfers.length} $TROLL transfers from wallet history (including older transactions where available).`;
+      noteEl.textContent = `Showing ${transfers.length} transfers to/from wallet ${TROLL_WALLET}.`;
     }
 
     async function loadTrollStats() {
