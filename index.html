@@ -79,6 +79,59 @@ body {
 }
 .pill:hover { background: var(--accent-soft); }
 
+.live-control {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #08100a;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-only {
+  display: none;
+}
+
+.live-control-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.live-toggle-btn {
+  border: 1px solid var(--line);
+  background: rgba(126, 255, 142, 0.08);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.live-toggle-btn:hover {
+  background: rgba(126, 255, 142, 0.18);
+}
+
+.live-popup {
+  margin-top: 10px;
+  border: 1px solid rgba(255, 115, 115, 0.35);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, rgba(255, 83, 83, 0.18), rgba(255, 83, 83, 0.05));
+  color: #ffd6d6;
+  font-size: 13px;
+  display: none;
+}
+
+.live-popup.show {
+  display: block;
+}
+
 .hero {
   margin-top: 20px;
   border: 1px solid var(--line);
@@ -261,6 +314,68 @@ h1 {
   color: var(--text);
   font-size: 13px;
   overflow-wrap: anywhere;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.wallet-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.copy-btn {
+  flex: 0 0 auto;
+  border: 1px solid rgba(216, 255, 224, 0.25);
+  background: rgba(11, 20, 13, 0.75);
+  width: 34px;
+  height: 30px;
+  border-radius: 7px;
+  color: #9db2a2;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.copy-icon {
+  position: relative;
+  width: 16px;
+  height: 16px;
+}
+
+.copy-square {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  background: rgba(157, 178, 162, 0.18);
+}
+
+.copy-square.back {
+  top: 2px;
+  left: 5px;
+}
+
+.copy-square.front {
+  top: 5px;
+  left: 2px;
+}
+
+.copy-btn:hover {
+  background: rgba(126, 255, 142, 0.12);
+  color: #ced9d1;
+}
+
+.copy-btn:active {
+  transform: translateY(1px);
+}
+
+.copy-btn.copied {
+  color: var(--accent);
+  border-color: var(--line);
 }
 
 @media (max-width: 860px) {
@@ -278,6 +393,16 @@ h1 {
         <a class="pill" href="https://nutrition.trollrunner.net">Nutrition</a>
         <a class="pill" href="https://trollrunner.net">Main Site</a>
       </nav>
+    </div>
+    <section id="admin-live-control" class="live-control admin-only" aria-label="Homepage live popup control">
+      <div>
+        <div class="label">Live Status Popup Control</div>
+        <div id="live-control-note" class="live-control-note">Live popup is currently OFF.</div>
+      </div>
+      <button id="live-toggle-btn" class="live-toggle-btn" type="button" aria-pressed="false">Turn Live ON</button>
+    </section>
+    <div id="live-popup" class="live-popup" role="status" aria-live="polite">
+      🔴 Live now: Troll Runner stream is active.
     </div>
 
     <section class="hero">
@@ -301,7 +426,15 @@ h1 {
 
             <section class="donation" aria-label="Troll Fund wallet">
         <h2>Troll Fund Wallet</h2>
-        <div class="wallet">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</div>
+        <div class="wallet">
+          <span id="wallet-address" class="wallet-value">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</span>
+          <button id="copy-wallet-btn" class="copy-btn" type="button" aria-label="Copy Troll Fund wallet address" title="Copy wallet address">
+            <span class="copy-icon" aria-hidden="true">
+              <span class="copy-square back"></span>
+              <span class="copy-square front"></span>
+            </span>
+          </button>
+        </div>
         <p style="margin-top:10px; color: var(--muted); font-size: 13px;">
           Conversion rate: $6.90 = 1 mile ran = 1 sticker</p>
       </section>
@@ -316,6 +449,15 @@ h1 {
     ];
     const MAX_TRANSFER_ITEMS = 12;
     const MAX_SIGNATURE_SCAN = 250;
+    const BALANCE_CACHE_KEY = "troll_stats_cache_v1";
+    const LIVE_STATUS_CACHE_KEY = "troll_live_status_v1";
+    const CACHE_TTL_MS = 2 * 60 * 1000;
+    const LIVE_STATUS_POLL_MS = 7000;
+    // Optional remote sync endpoint (must support CORS GET/PUT JSON).
+    // Example body: { "isLive": true, "updatedAt": 1713312000000, "source": "device-id" }
+    const LIVE_STATUS_SYNC_ENDPOINT = "https://finance.trollrunner.net/live-status.json";
+    const DEVICE_ID = `device-${Math.random().toString(36).slice(2, 10)}`;
+    const IS_ADMIN_MODE = new URLSearchParams(window.location.search).get("admin") === "1";
     let latestTrollUsd = null;
     let cachedTransfers = [];
 
@@ -377,20 +519,28 @@ h1 {
     }
 
     async function getTrollBalanceFromEndpoint(endpoint) {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getTokenAccountsByOwner",
-          params: [
-            TROLL_WALLET,
-            { mint: TROLL_MINT },
-            { encoding: "jsonParsed" }
-          ]
-        }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      let res;
+      try {
+        res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "getTokenAccountsByOwner",
+            params: [
+              TROLL_WALLET,
+              { mint: TROLL_MINT },
+              { encoding: "jsonParsed" }
+            ]
+          }),
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
       if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
       const json = await res.json();
       if (json?.error) throw new Error(`${endpoint} RPC error: ${json.error.message || "unknown"}`);
@@ -403,16 +553,167 @@ h1 {
     }
 
     async function getTrollBalance() {
-      let lastError;
-      for (const endpoint of SOLANA_RPC_ENDPOINTS) {
-        try {
-          return await getTrollBalanceFromEndpoint(endpoint);
-        } catch (err) {
-          lastError = err;
-          console.warn(`Balance fetch failed on ${endpoint}`, err);
-        }
+      try {
+        return await Promise.any(
+          SOLANA_RPC_ENDPOINTS.map((endpoint) =>
+            getTrollBalanceFromEndpoint(endpoint).catch((err) => {
+              console.warn(`Balance fetch failed on ${endpoint}`, err);
+              throw err;
+            })
+          )
+        );
+      } catch (err) {
+        throw new Error("Unable to fetch balance from any Solana RPC endpoint");
       }
-      throw lastError || new Error("Unable to fetch balance from any Solana RPC endpoint");
+    }
+
+    function readStatsCache() {
+      try {
+        const raw = localStorage.getItem(BALANCE_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || Date.now() - Number(parsed.timestamp || 0) > CACHE_TTL_MS) return null;
+        return parsed;
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function writeStatsCache(payload) {
+      try {
+        localStorage.setItem(BALANCE_CACHE_KEY, JSON.stringify({
+          ...payload,
+          timestamp: Date.now(),
+        }));
+      } catch (err) {
+        // ignore storage failures
+      }
+    }
+
+    function applyCachedStats() {
+      const cached = readStatsCache();
+      if (!cached) return false;
+      const balanceEl = document.getElementById("troll-balance");
+      const usdEl = document.getElementById("troll-usd");
+      const marketLineEl = document.getElementById("market-line");
+      balanceEl.textContent = `${fmtTokenAmount(cached.balance)} TROLL`;
+      usdEl.textContent = `$${fmtUsd(cached.usdValue)}`;
+      marketLineEl.textContent = `Showing cached values while refreshing live market data...`;
+      latestTrollUsd = Number(cached.price || 0) || null;
+      return true;
+    }
+
+    function getLocalLiveStatus() {
+      try {
+        const raw = localStorage.getItem(LIVE_STATUS_CACHE_KEY);
+        if (!raw) return { isLive: false, updatedAt: 0, source: null };
+        const parsed = JSON.parse(raw);
+        return {
+          isLive: Boolean(parsed?.isLive),
+          updatedAt: Number(parsed?.updatedAt || 0),
+          source: parsed?.source || null,
+        };
+      } catch (err) {
+        return { isLive: false, updatedAt: 0, source: null };
+      }
+    }
+
+    function setLocalLiveStatus(payload) {
+      const next = {
+        isLive: Boolean(payload?.isLive),
+        updatedAt: Number(payload?.updatedAt || Date.now()),
+        source: payload?.source || DEVICE_ID,
+      };
+      try {
+        localStorage.setItem(LIVE_STATUS_CACHE_KEY, JSON.stringify(next));
+      } catch (err) {
+        // ignore
+      }
+      return next;
+    }
+
+    function renderLiveStatus(state) {
+      const popupEl = document.getElementById("live-popup");
+      const noteEl = document.getElementById("live-control-note");
+      const buttonEl = document.getElementById("live-toggle-btn");
+      if (!popupEl || !noteEl || !buttonEl) return;
+
+      if (state.isLive) {
+        popupEl.classList.add("show");
+        noteEl.textContent = "Live popup is currently ON.";
+        buttonEl.textContent = "Turn Live OFF";
+        buttonEl.setAttribute("aria-pressed", "true");
+      } else {
+        popupEl.classList.remove("show");
+        noteEl.textContent = "Live popup is currently OFF.";
+        buttonEl.textContent = "Turn Live ON";
+        buttonEl.setAttribute("aria-pressed", "false");
+      }
+    }
+
+    async function pushLiveStatusRemote(state) {
+      if (!LIVE_STATUS_SYNC_ENDPOINT) return;
+      try {
+        await fetch(LIVE_STATUS_SYNC_ENDPOINT, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(state),
+        });
+      } catch (err) {
+        console.warn("Remote live status sync unavailable; local status still applied.", err);
+      }
+    }
+
+    async function pullLiveStatusRemote() {
+      if (!LIVE_STATUS_SYNC_ENDPOINT) return null;
+      try {
+        const res = await fetch(`${LIVE_STATUS_SYNC_ENDPOINT}?t=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) return null;
+        const json = await res.json();
+        if (typeof json?.isLive !== "boolean") return null;
+        return {
+          isLive: Boolean(json.isLive),
+          updatedAt: Number(json.updatedAt || 0),
+          source: json.source || null,
+        };
+      } catch (err) {
+        return null;
+      }
+    }
+
+    async function syncLiveStatusFromRemote() {
+      const remote = await pullLiveStatusRemote();
+      if (!remote) return;
+      const local = getLocalLiveStatus();
+      if (remote.updatedAt > local.updatedAt) {
+        const merged = setLocalLiveStatus(remote);
+        renderLiveStatus(merged);
+      }
+    }
+
+    function setupLiveStatusControl() {
+      const buttonEl = document.getElementById("live-toggle-btn");
+      const adminControlEl = document.getElementById("admin-live-control");
+      if (adminControlEl && IS_ADMIN_MODE) {
+        adminControlEl.classList.remove("admin-only");
+      }
+
+      renderLiveStatus(getLocalLiveStatus());
+      syncLiveStatusFromRemote();
+      setInterval(syncLiveStatusFromRemote, LIVE_STATUS_POLL_MS);
+
+      if (!buttonEl || !IS_ADMIN_MODE) return;
+
+      buttonEl.addEventListener("click", async () => {
+        const current = getLocalLiveStatus();
+        const next = setLocalLiveStatus({
+          isLive: !current.isLive,
+          updatedAt: Date.now(),
+          source: DEVICE_ID,
+        });
+        renderLiveStatus(next);
+        await pushLiveStatusRemote(next);
+      });
     }
 
     function shortenAddress(value) {
@@ -575,6 +876,11 @@ h1 {
         const usdValue = balanceResult.value.amount * priceResult.value.trollUsd;
         usdEl.textContent = `$${fmtUsd(usdValue)}`;
         marketLineEl.textContent = `${priceResult.value.source} live: $TROLL $${fmtPrice(priceResult.value.trollUsd)} | Wallet via ${new URL(balanceResult.value.endpoint).hostname}`;
+        writeStatsCache({
+          balance: balanceResult.value.amount,
+          usdValue,
+          price: priceResult.value.trollUsd,
+        });
         return;
       }
 
@@ -593,6 +899,28 @@ h1 {
       if (priceResult.status === "rejected") console.error("Unable to load $TROLL price", priceResult.reason);
       if (balanceResult.status === "rejected") console.error("Unable to load $TROLL wallet balance", balanceResult.reason);
     }
+
+    function setupWalletCopyButton() {
+      const button = document.getElementById("copy-wallet-btn");
+      if (!button) return;
+      button.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(TROLL_WALLET);
+          button.classList.add("copied");
+          button.title = "Copied!";
+          setTimeout(() => {
+            button.classList.remove("copied");
+            button.title = "Copy wallet address";
+          }, 1100);
+        } catch (err) {
+          console.error("Clipboard copy failed", err);
+        }
+      });
+    }
+
+    setupWalletCopyButton();
+    applyCachedStats();
+    setupLiveStatusControl();
 
     Promise.allSettled([loadTrollStats(), loadTransfers()]).then(() => {
       // If price resolved after transfers rendered, refresh USD estimations.
