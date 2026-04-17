@@ -261,6 +261,43 @@ h1 {
   color: var(--text);
   font-size: 13px;
   overflow-wrap: anywhere;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.wallet-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.copy-btn {
+  flex: 0 0 auto;
+  border: 1px solid rgba(216, 255, 224, 0.25);
+  background: rgba(11, 20, 13, 0.75);
+  width: 34px;
+  height: 30px;
+  border-radius: 7px;
+  color: #9db2a2;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.copy-btn:hover {
+  background: rgba(126, 255, 142, 0.12);
+  color: #ced9d1;
+}
+
+.copy-btn:active {
+  transform: translateY(1px);
+}
+
+.copy-btn.copied {
+  color: var(--accent);
+  border-color: var(--line);
 }
 
 @media (max-width: 860px) {
@@ -301,7 +338,15 @@ h1 {
 
             <section class="donation" aria-label="Troll Fund wallet">
         <h2>Troll Fund Wallet</h2>
-        <div class="wallet">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</div>
+        <div class="wallet">
+          <span id="wallet-address" class="wallet-value">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</span>
+          <button id="copy-wallet-btn" class="copy-btn" type="button" aria-label="Copy Troll Fund wallet address" title="Copy wallet address">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <rect x="6" y="2" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"></rect>
+              <rect x="2" y="6" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"></rect>
+            </svg>
+          </button>
+        </div>
         <p style="margin-top:10px; color: var(--muted); font-size: 13px;">
           Conversion rate: $6.90 = 1 mile ran = 1 sticker</p>
       </section>
@@ -316,6 +361,8 @@ h1 {
     ];
     const MAX_TRANSFER_ITEMS = 12;
     const MAX_SIGNATURE_SCAN = 250;
+    const BALANCE_CACHE_KEY = "troll_stats_cache_v1";
+    const CACHE_TTL_MS = 2 * 60 * 1000;
     let latestTrollUsd = null;
     let cachedTransfers = [];
 
@@ -377,20 +424,28 @@ h1 {
     }
 
     async function getTrollBalanceFromEndpoint(endpoint) {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getTokenAccountsByOwner",
-          params: [
-            TROLL_WALLET,
-            { mint: TROLL_MINT },
-            { encoding: "jsonParsed" }
-          ]
-        }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      let res;
+      try {
+        res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "getTokenAccountsByOwner",
+            params: [
+              TROLL_WALLET,
+              { mint: TROLL_MINT },
+              { encoding: "jsonParsed" }
+            ]
+          }),
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
       if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
       const json = await res.json();
       if (json?.error) throw new Error(`${endpoint} RPC error: ${json.error.message || "unknown"}`);
@@ -403,16 +458,54 @@ h1 {
     }
 
     async function getTrollBalance() {
-      let lastError;
-      for (const endpoint of SOLANA_RPC_ENDPOINTS) {
-        try {
-          return await getTrollBalanceFromEndpoint(endpoint);
-        } catch (err) {
-          lastError = err;
-          console.warn(`Balance fetch failed on ${endpoint}`, err);
-        }
+      try {
+        return await Promise.any(
+          SOLANA_RPC_ENDPOINTS.map((endpoint) =>
+            getTrollBalanceFromEndpoint(endpoint).catch((err) => {
+              console.warn(`Balance fetch failed on ${endpoint}`, err);
+              throw err;
+            })
+          )
+        );
+      } catch (err) {
+        throw new Error("Unable to fetch balance from any Solana RPC endpoint");
       }
-      throw lastError || new Error("Unable to fetch balance from any Solana RPC endpoint");
+    }
+
+    function readStatsCache() {
+      try {
+        const raw = localStorage.getItem(BALANCE_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || Date.now() - Number(parsed.timestamp || 0) > CACHE_TTL_MS) return null;
+        return parsed;
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function writeStatsCache(payload) {
+      try {
+        localStorage.setItem(BALANCE_CACHE_KEY, JSON.stringify({
+          ...payload,
+          timestamp: Date.now(),
+        }));
+      } catch (err) {
+        // ignore storage failures
+      }
+    }
+
+    function applyCachedStats() {
+      const cached = readStatsCache();
+      if (!cached) return false;
+      const balanceEl = document.getElementById("troll-balance");
+      const usdEl = document.getElementById("troll-usd");
+      const marketLineEl = document.getElementById("market-line");
+      balanceEl.textContent = `${fmtTokenAmount(cached.balance)} TROLL`;
+      usdEl.textContent = `$${fmtUsd(cached.usdValue)}`;
+      marketLineEl.textContent = `Showing cached values while refreshing live market data...`;
+      latestTrollUsd = Number(cached.price || 0) || null;
+      return true;
     }
 
     function shortenAddress(value) {
@@ -575,6 +668,11 @@ h1 {
         const usdValue = balanceResult.value.amount * priceResult.value.trollUsd;
         usdEl.textContent = `$${fmtUsd(usdValue)}`;
         marketLineEl.textContent = `${priceResult.value.source} live: $TROLL $${fmtPrice(priceResult.value.trollUsd)} | Wallet via ${new URL(balanceResult.value.endpoint).hostname}`;
+        writeStatsCache({
+          balance: balanceResult.value.amount,
+          usdValue,
+          price: priceResult.value.trollUsd,
+        });
         return;
       }
 
@@ -593,6 +691,27 @@ h1 {
       if (priceResult.status === "rejected") console.error("Unable to load $TROLL price", priceResult.reason);
       if (balanceResult.status === "rejected") console.error("Unable to load $TROLL wallet balance", balanceResult.reason);
     }
+
+    function setupWalletCopyButton() {
+      const button = document.getElementById("copy-wallet-btn");
+      if (!button) return;
+      button.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(TROLL_WALLET);
+          button.classList.add("copied");
+          button.title = "Copied!";
+          setTimeout(() => {
+            button.classList.remove("copied");
+            button.title = "Copy wallet address";
+          }, 1100);
+        } catch (err) {
+          console.error("Clipboard copy failed", err);
+        }
+      });
+    }
+
+    setupWalletCopyButton();
+    applyCachedStats();
 
     Promise.allSettled([loadTrollStats(), loadTransfers()]).then(() => {
       // If price resolved after transfers rendered, refresh USD estimations.
