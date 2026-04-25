@@ -87,6 +87,17 @@ body {
   background: linear-gradient(180deg, rgba(18, 29, 21, 0.8), rgba(7, 11, 8, 0.9));
 }
 
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 360px);
+  gap: 18px;
+  align-items: start;
+}
+
+.hero-copy {
+  min-width: 0;
+}
+
 h1 {
   margin: 0 0 6px;
   font-size: 32px;
@@ -98,6 +109,17 @@ h1 {
   margin: 0;
   color: var(--muted);
   font-size: 14px;
+}
+
+.terminal {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 10px;
+  background: #030603;
+  border: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+  white-space: pre-wrap;
 }
 
 .stats {
@@ -127,15 +149,239 @@ h1 {
   text-shadow: 0 0 12px rgba(126, 255, 142, 0.5);
 }
 
-.terminal {
-  margin-top: 14px;
-  padding: 14px;
-  border-radius: 10px;
-  background: #030603;
+.finance-animation-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
   border: 1px solid var(--line);
-  font-size: 13px;
-  color: var(--muted);
-  white-space: pre-wrap;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(126, 255, 142, 0.14), transparent 24%),
+    linear-gradient(180deg, rgba(11, 20, 13, 0.98), rgba(4, 8, 5, 0.98));
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4) inset, 0 28px 50px rgba(0, 0, 0, 0.45);
+}
+
+.finance-animation-frame {
+  position: relative;
+  aspect-ratio: 5 / 6;
+  overflow: hidden;
+}
+
+.finance-animation-frame::before {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(126, 255, 142, 0.18);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.finance-animation-poster {
+  position: absolute;
+  inset: 10px 10px 46px;
+  width: calc(100% - 20px);
+  height: calc(100% - 56px);
+  object-fit: cover;
+  border-radius: 18px;
+  display: block;
+  filter: contrast(1.03) saturate(1.02);
+  z-index: 4;
+  opacity: 0;
+  animation: finance-puppet-final-reveal 7.2s ease-in-out infinite;
+}
+
+.finance-animation-credit {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 8px;
+  height: 24px;
+  z-index: 6;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+}
+
+.finance-animation-credit-track {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  animation: finance-credit-marquee-scroll 18s linear infinite;
+}
+
+.finance-animation-credit-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 48px;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1;
+  color: rgba(216, 255, 224, 0.82);
+}
+
+.finance-animation-credit a {
+  color: #7ab9ff;
+  text-decoration: none;
+}
+
+.finance-animation-credit a:hover {
+  color: #a7d2ff;
+  text-decoration: underline;
+}
+
+.finance-puppet-stage {
+  position: absolute;
+  inset: 10px 10px 46px;
+  border-radius: 18px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 3;
+  animation:
+    finance-puppet-stage-settle 7.2s ease-in-out infinite,
+    finance-puppet-stage-fade 7.2s ease-in-out infinite;
+}
+
+.finance-puppet-backplate,
+.finance-puppet-piece {
+  position: absolute;
+  inset: 0;
+  background-image: var(--finance-poster);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.finance-puppet-backplate {
+  opacity: 0.16;
+  filter: blur(7px) saturate(0.8) brightness(0.94);
+  transform: scale(1.03);
+  animation: finance-puppet-backplate-fade 7.2s ease-in-out infinite;
+}
+
+.finance-puppet-piece {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+
+.finance-puppet-body {
+  z-index: 3;
+  clip-path: polygon(39% 11%, 61% 11%, 61.5% 20%, 59% 38%, 60.5% 95%, 39.5% 95%, 41% 38%, 38.5% 20%);
+  animation: finance-puppet-body-settle 7.2s cubic-bezier(0.55, 0, 0.22, 1) infinite;
+}
+
+.finance-puppet-arm-lower-left {
+  z-index: 2;
+  clip-path: polygon(3% 32%, 45% 31%, 45% 47%, 3% 48%);
+  transform-origin: 46% 39%;
+  animation: finance-puppet-arm-lower-left 7.2s cubic-bezier(0.55, 0, 0.22, 1) infinite;
+}
+
+.finance-puppet-arm-lower-right {
+  z-index: 2;
+  clip-path: polygon(55% 31%, 97% 32%, 97% 48%, 55% 47%);
+  transform-origin: 54% 39%;
+  animation: finance-puppet-arm-lower-right 7.2s cubic-bezier(0.55, 0, 0.22, 1) infinite;
+}
+
+.finance-puppet-arm-upper-left {
+  z-index: 1;
+  clip-path: polygon(4% 18%, 49% 17%, 49% 37%, 4% 34%);
+  transform-origin: 49% 33%;
+  animation: finance-puppet-arm-upper-left 7.2s cubic-bezier(0.55, 0, 0.22, 1) infinite;
+}
+
+.finance-puppet-arm-upper-right {
+  z-index: 1;
+  clip-path: polygon(51% 17%, 96% 18%, 96% 34%, 51% 37%);
+  transform-origin: 51% 33%;
+  animation: finance-puppet-arm-upper-right 7.2s cubic-bezier(0.55, 0, 0.22, 1) infinite;
+}
+
+.finance-puppet-leg-left {
+  z-index: 1;
+  clip-path: polygon(14% 52%, 46% 51%, 35% 95%, 11% 95%);
+  transform-origin: 47% 58%;
+  animation: finance-puppet-leg-left 7.2s cubic-bezier(0.55, 0, 0.22, 1) infinite;
+}
+
+.finance-puppet-leg-right {
+  z-index: 1;
+  clip-path: polygon(54% 51%, 86% 52%, 89% 95%, 65% 95%);
+  transform-origin: 53% 58%;
+  animation: finance-puppet-leg-right 7.2s cubic-bezier(0.55, 0, 0.22, 1) infinite;
+}
+
+@keyframes finance-credit-marquee-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes finance-puppet-stage-settle {
+  0%, 16% { transform: translateY(1.2%) scale(1.01); }
+  38%, 80% { transform: translateY(0) scale(1); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes finance-puppet-stage-fade {
+  0%, 70% { opacity: 1; }
+  84%, 100% { opacity: 0; }
+}
+
+@keyframes finance-puppet-backplate-fade {
+  0%, 18% { opacity: 0.09; }
+  44%, 74% { opacity: 0.19; }
+  100% { opacity: 0.08; }
+}
+
+@keyframes finance-puppet-body-settle {
+  0%, 14% { transform: scaleX(0.9) scaleY(0.985); opacity: 0.86; }
+  40%, 78% { transform: scaleX(1) scaleY(1); opacity: 1; }
+  100% { transform: scaleX(1) scaleY(1); opacity: 1; }
+}
+
+@keyframes finance-puppet-arm-lower-left {
+  0%, 12% { transform: rotate(78deg) translate(23%, -4%) scale(0.93); opacity: 0.1; }
+  32%, 66% { transform: rotate(0deg) translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: rotate(0deg) translate(0, 0) scale(1); opacity: 0; }
+}
+
+@keyframes finance-puppet-arm-lower-right {
+  0%, 12% { transform: rotate(-78deg) translate(-23%, -4%) scale(0.93); opacity: 0.1; }
+  32%, 66% { transform: rotate(0deg) translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: rotate(0deg) translate(0, 0) scale(1); opacity: 0; }
+}
+
+@keyframes finance-puppet-arm-upper-left {
+  0%, 18% { transform: rotate(98deg) translate(21%, 4%) scale(0.92); opacity: 0.05; }
+  40%, 70% { transform: rotate(0deg) translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: rotate(0deg) translate(0, 0) scale(1); opacity: 0; }
+}
+
+@keyframes finance-puppet-arm-upper-right {
+  0%, 18% { transform: rotate(-98deg) translate(-21%, 4%) scale(0.92); opacity: 0.05; }
+  40%, 70% { transform: rotate(0deg) translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: rotate(0deg) translate(0, 0) scale(1); opacity: 0; }
+}
+
+@keyframes finance-puppet-leg-left {
+  0%, 16% { transform: rotate(15deg) translate(30%, 3%) scale(0.94); opacity: 0.12; }
+  42%, 72% { transform: rotate(0deg) translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: rotate(0deg) translate(0, 0) scale(1); opacity: 0; }
+}
+
+@keyframes finance-puppet-leg-right {
+  0%, 16% { transform: rotate(-15deg) translate(-30%, 3%) scale(0.94); opacity: 0.12; }
+  42%, 72% { transform: rotate(0deg) translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: rotate(0deg) translate(0, 0) scale(1); opacity: 0; }
+}
+
+@keyframes finance-puppet-final-reveal {
+  0%, 60% { opacity: 0; }
+  74%, 94% { opacity: 0.96; }
+  100% { opacity: 0; }
 }
 
 .grid {
@@ -354,8 +600,44 @@ h1 {
 }
 
 @media (max-width: 860px) {
+  .hero-grid { grid-template-columns: 1fr; }
   .stats, .grid { grid-template-columns: 1fr; }
   h1 { font-size: 28px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .finance-animation-credit {
+    justify-content: center;
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+
+  .finance-animation-credit-track {
+    animation: none;
+  }
+
+  .finance-animation-credit-copy + .finance-animation-credit-copy {
+    display: none;
+  }
+
+  .finance-animation-poster {
+    opacity: 1;
+    animation: none;
+  }
+
+  .finance-puppet-stage,
+  .finance-puppet-backplate,
+  .finance-puppet-piece,
+  .finance-puppet-body,
+  .finance-puppet-arm-lower-left,
+  .finance-puppet-arm-lower-right,
+  .finance-puppet-arm-upper-left,
+  .finance-puppet-arm-upper-right,
+  .finance-puppet-leg-left,
+  .finance-puppet-leg-right {
+    animation: none;
+    opacity: 0;
+  }
 }
 </style>
 </head>
@@ -372,38 +654,93 @@ h1 {
     </div>
 
     <section class="hero">
-      <h1>Treasury Console</h1>
-      <p class="sub" id="market-line">Loading market data...</p>
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <h1>Treasury Console</h1>
+          <p class="sub" id="market-line">Loading market data...</p>
 
-      <div class="stats">
-        <article class="stat">
-          <div class="label">$TROLL Balance</div>
-          <div id="troll-balance" class="value">Loading...</div>
-        </article>
-        <article class="stat">
-          <div class="label">USD Value</div>
-          <div id="troll-usd" class="value">Loading...</div>
-        </article>
-        <article class="stat">
-          <div class="label">System Status</div>
-          <div class="value">Trolling</div>
-        </article>
-      </div>
+          <div class="stats">
+            <article class="stat">
+              <div class="label">$TROLL Balance</div>
+              <div id="troll-balance" class="value">Loading...</div>
+            </article>
+            <article class="stat">
+              <div class="label">USD Value</div>
+              <div id="troll-usd" class="value">Loading...</div>
+            </article>
+            <article class="stat">
+              <div class="label">System Status</div>
+              <div class="value">Trolling</div>
+            </article>
+          </div>
 
-            <section class="donation" aria-label="Troll Fund wallet">
-        <h2>Troll Fund Wallet</h2>
-        <div class="wallet">
-          <span id="wallet-address" class="wallet-value">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</span>
-          <button id="copy-wallet-btn" class="copy-btn" type="button" aria-label="Copy Troll Fund wallet address" title="Copy wallet address">
-            <span class="copy-icon" aria-hidden="true">
-              <span class="copy-square back"></span>
-              <span class="copy-square front"></span>
-            </span>
-          </button>
+          <section class="donation" aria-label="Troll Fund wallet">
+            <h2>Troll Fund Wallet</h2>
+            <div class="wallet">
+              <span id="wallet-address" class="wallet-value">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</span>
+              <button id="copy-wallet-btn" class="copy-btn" type="button" aria-label="Copy Troll Fund wallet address" title="Copy wallet address">
+                <span class="copy-icon" aria-hidden="true">
+                  <span class="copy-square back"></span>
+                  <span class="copy-square front"></span>
+                </span>
+              </button>
+            </div>
+            <p style="margin-top:10px; color: var(--muted); font-size: 13px;">
+              Conversion rate: $6.90 = 1 mile ran = 1 sticker
+            </p>
+          </section>
+
+          <div class="terminal">This console tracks the Troll Fund wallet, live $TROLL pricing, and recent treasury activity. The green charge visual was moved here from the main site as the finance portal signal.</div>
         </div>
-        <p style="margin-top:10px; color: var(--muted); font-size: 13px;">
-          Conversion rate: $6.90 = 1 mile ran = 1 sticker</p>
-      </section>
+
+        <aside class="finance-animation-card" style="--finance-poster: url('https://trollrunner.net/assets/animations/green-suit-charge.jpg');" aria-label="Finance portal featured art">
+          <div class="finance-animation-frame">
+            <div class="finance-puppet-stage" aria-hidden="true">
+              <div class="finance-puppet-backplate"></div>
+              <div class="finance-puppet-piece finance-puppet-arm-upper-left"></div>
+              <div class="finance-puppet-piece finance-puppet-arm-upper-right"></div>
+              <div class="finance-puppet-piece finance-puppet-leg-left"></div>
+              <div class="finance-puppet-piece finance-puppet-leg-right"></div>
+              <div class="finance-puppet-piece finance-puppet-arm-lower-left"></div>
+              <div class="finance-puppet-piece finance-puppet-arm-lower-right"></div>
+              <div class="finance-puppet-piece finance-puppet-body"></div>
+            </div>
+            <img class="finance-animation-poster" src="https://trollrunner.net/assets/animations/green-suit-charge.jpg" alt="Trollface suited figure charging green inside a circular frame">
+            <div class="finance-animation-credit" aria-label="Artwork credits">
+              <div class="finance-animation-credit-track">
+                <span class="finance-animation-credit-copy">Original Art: <a href="https://twitter.com/SwishPng" target="_blank" rel="noreferrer">@SwishPng</a> | Adapted: <a href="https://twitter.com/troll_runner" target="_blank" rel="noreferrer">@troll_runner</a></span>
+                <span class="finance-animation-credit-copy" aria-hidden="true">Original Art: <a href="https://twitter.com/SwishPng" target="_blank" rel="noreferrer" tabindex="-1">@SwishPng</a> | Adapted: <a href="https://twitter.com/troll_runner" target="_blank" rel="noreferrer" tabindex="-1">@troll_runner</a></span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top: 14px;" aria-labelledby="transfers-heading">
+      <div class="transfers-header">
+        <h3 id="transfers-heading">Recent $TROLL Transfers</h3>
+        <span id="transfer-status" class="transfers-note">Loading recent transfers...</span>
+      </div>
+      <div id="transfer-list" class="transfer-list">
+        <div class="transfer-item">Loading on-chain transfer history...</div>
+      </div>
+    </section>
+
+    <section class="grid" aria-label="Finance notes">
+      <article class="card">
+        <h3>Mission Budget</h3>
+        <p>Funding supports route scouting, hydration, nutrition, sticker production, and the gear needed to keep the project moving.</p>
+      </article>
+      <article class="card">
+        <h3>Treasury Policy</h3>
+        <p>Wallet activity is surfaced here so supporters can follow inflows, outflows, and how the Troll Fund converts support into real-world motion.</p>
+      </article>
+      <article class="card">
+        <h3>Portal Links</h3>
+        <p>Use the top nav to jump back into the main site, nutrition, blog, or projects while the finance console keeps watch over the fund.</p>
+      </article>
+    </section>
   </div>
   <script>
     const TROLL_WALLET = "79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA";
