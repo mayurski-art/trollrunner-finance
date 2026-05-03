@@ -407,6 +407,543 @@ h1 {
 
 .card p { margin: 0; color: var(--muted); line-height: 1.5; font-size: 14px; }
 
+.death-ledger {
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(circle at top right, rgba(126, 255, 142, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(10, 18, 11, 0.98), rgba(4, 8, 5, 0.98));
+}
+
+.death-ledger-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.death-ledger-copy {
+  max-width: 620px;
+}
+
+.death-ledger-copy h2 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.death-ledger-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.death-rollup {
+  width: min(320px, 100%);
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(126, 255, 142, 0.14);
+  background:
+    linear-gradient(180deg, rgba(126, 255, 142, 0.1), rgba(126, 255, 142, 0.03)),
+    rgba(7, 12, 8, 0.92);
+}
+
+.death-rollup h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.death-rollup-line {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: 13px;
+}
+
+.death-rollup-line strong {
+  color: var(--text);
+}
+
+.death-ledger-nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.death-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 118px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(126, 255, 142, 0.08);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.death-pill:hover {
+  background: rgba(126, 255, 142, 0.16);
+}
+
+.death-summary {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.death-stat {
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(7, 12, 8, 0.88);
+}
+
+.death-stat-label {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.death-stat-value {
+  margin-top: 6px;
+  font-size: 26px;
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(126, 255, 142, 0.35);
+}
+
+.death-stat-copy {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.death-sections {
+  margin-top: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.death-panel {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  background: rgba(7, 12, 8, 0.84);
+}
+
+.death-panel-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.death-panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.death-panel-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.doom-chart {
+  display: grid;
+  gap: 14px;
+}
+
+.chart-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.chart-toolbar-copy {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.chart-range-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chart-range-btn {
+  border: 1px solid rgba(126, 255, 142, 0.2);
+  background: rgba(126, 255, 142, 0.06);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.chart-range-btn:hover,
+.chart-range-btn.is-active {
+  background: rgba(126, 255, 142, 0.16);
+  color: var(--text);
+}
+
+.doom-chart-shell {
+  position: relative;
+  min-height: 320px;
+  padding: 18px 14px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(126, 255, 142, 0.12);
+  background:
+    linear-gradient(180deg, rgba(4, 7, 5, 0.96), rgba(10, 18, 11, 0.9));
+}
+
+.doom-chart-grid {
+  width: 100%;
+  height: 250px;
+  display: block;
+}
+
+.chart-grid-line {
+  stroke: rgba(126, 255, 142, 0.09);
+  stroke-width: 1;
+}
+
+.chart-area-fill {
+  fill: rgba(126, 255, 142, 0.12);
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 10px rgba(126, 255, 142, 0.28));
+}
+
+.chart-dot {
+  fill: var(--accent);
+  stroke: rgba(4, 7, 5, 0.9);
+  stroke-width: 2;
+}
+
+.chart-axis-label {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.chart-empty {
+  min-height: 250px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.chart-events-layer {
+  position: absolute;
+  inset: 18px 14px 44px 14px;
+  pointer-events: none;
+}
+
+.chart-event-node {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  margin-top: -11px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  pointer-events: auto;
+  font-size: 16px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.3));
+}
+
+.chart-event-node:hover,
+.chart-event-node.is-active {
+  transform: scale(1.12);
+}
+
+.chart-event-node-fud {
+  color: #ffb38a;
+}
+
+.chart-event-node-guardian {
+  color: #bfe7ff;
+}
+
+.chart-event-popover {
+  position: absolute;
+  z-index: 3;
+  width: min(300px, calc(100% - 20px));
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(126, 255, 142, 0.16);
+  background: rgba(6, 10, 7, 0.96);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
+.chart-event-popover[hidden] {
+  display: none;
+}
+
+.chart-event-popover h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.chart-event-popover p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.chart-event-popover-meta {
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.chart-event-popover-link {
+  display: inline-flex;
+  margin-top: 10px;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.chart-event-popover-link:hover {
+  text-decoration: underline;
+}
+
+.chart-meta {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.chart-meta-card {
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(126, 255, 142, 0.14);
+  background: rgba(126, 255, 142, 0.05);
+}
+
+.chart-meta-label {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.chart-meta-value {
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.chart-notes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.chart-note {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(126, 255, 142, 0.14);
+  background: rgba(126, 255, 142, 0.05);
+}
+
+.chart-note strong {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+
+.chart-note span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.timeline-list {
+  display: grid;
+  gap: 12px;
+}
+
+.timeline-mode-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.timeline-mode-btn {
+  border: 1px solid rgba(126, 255, 142, 0.18);
+  background: rgba(126, 255, 142, 0.05);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.timeline-mode-btn:hover,
+.timeline-mode-btn.is-active {
+  background: rgba(126, 255, 142, 0.16);
+  color: var(--text);
+}
+
+.timeline-item {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 14px;
+  align-items: start;
+  padding-top: 12px;
+  border-top: 1px solid rgba(126, 255, 142, 0.1);
+}
+
+.timeline-item:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.timeline-date {
+  color: var(--accent);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.timeline-card {
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(126, 255, 142, 0.04);
+  border: 1px solid rgba(126, 255, 142, 0.12);
+}
+
+.timeline-source {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.timeline-source:hover {
+  text-decoration: underline;
+}
+
+.timeline-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.timeline-tag {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(126, 255, 142, 0.08);
+  border: 1px solid rgba(126, 255, 142, 0.12);
+  color: var(--text);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.timeline-card h4,
+.critic-card h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.timeline-card p,
+.critic-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.critics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.critic-card {
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(126, 255, 142, 0.14);
+  background:
+    linear-gradient(180deg, rgba(126, 255, 142, 0.08), rgba(126, 255, 142, 0.03)),
+    rgba(7, 12, 8, 0.92);
+}
+
+.critic-meta {
+  margin-bottom: 10px;
+  color: var(--accent);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.critic-quote {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.critic-outcome {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(126, 255, 142, 0.12);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .transfers-header {
   display: flex;
   justify-content: space-between;
@@ -601,8 +1138,10 @@ h1 {
 
 @media (max-width: 860px) {
   .hero-grid { grid-template-columns: 1fr; }
-  .stats, .grid { grid-template-columns: 1fr; }
+  .stats, .grid, .death-summary, .chart-notes, .chart-meta, .critics-grid { grid-template-columns: 1fr; }
+  .timeline-item { grid-template-columns: 1fr; gap: 8px; }
   h1 { font-size: 28px; }
+  .death-ledger-copy h2 { font-size: 24px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -726,19 +1265,99 @@ h1 {
       </div>
     </section>
 
-    <section class="grid" aria-label="Finance notes">
-      <article class="card">
-        <h3>Mission Budget</h3>
-        <p>Funding supports route scouting, hydration, sticker production, and the gear needed to keep the project moving.</p>
-      </article>
-      <article class="card">
-        <h3>Treasury Policy</h3>
-        <p>Wallet activity is surfaced here so supporters can follow inflows, outflows, and how the Troll Fund converts support into real-world motion.</p>
-      </article>
-      <article class="card">
-        <h3>Portal Links</h3>
-        <p>Use the top nav to jump back into the main site, blog, or projects while the finance console keeps watch over the fund.</p>
-      </article>
+    <section class="death-ledger" aria-labelledby="trolldeaths-heading">
+      <div class="death-ledger-top">
+        <div class="death-ledger-copy">
+          <h2 id="trolldeaths-heading">Trolldeaths</h2>
+          <p>
+            Inspired by the obituary-style rhythm of Bitcoin Is Dead, this section tracks the running archive of every “it’s over”
+            take, panic cycle, and anti-TROLL sermon we want to preserve. The point is not just to count doom calls. It is to show
+            how often the narrative collapses while Troll keeps moving.
+          </p>
+        </div>
+        <aside class="death-rollup" aria-label="Trolldeaths summary math">
+          <h3>Trolldeaths Math</h3>
+          <p class="death-rollup-line">TROLL has been declared dead <strong id="death-rollup-count">0 times</strong>.</p>
+          <p class="death-rollup-line">If you invested $100 each time, you'd have <strong id="death-rollup-return">$0</strong> today.</p>
+          <p class="death-rollup-line">Last updated on <strong id="death-rollup-updated">loading...</strong>.</p>
+        </aside>
+        <nav class="death-ledger-nav" aria-label="Trolldeaths sections">
+          <a class="death-pill" href="#death-chart">Chart</a>
+          <a class="death-pill" href="#death-timeline">Timeline</a>
+          <a class="death-pill" href="#death-critics">Critics</a>
+        </nav>
+      </div>
+
+      <div class="death-summary" aria-label="Trolldeaths summary">
+        <article class="death-stat">
+          <div class="death-stat-label">Recorded Doom Calls</div>
+          <div class="death-stat-value" id="doom-total">0</div>
+          <div class="death-stat-copy">A running count of logged FUD events and obituary posts.</div>
+        </article>
+        <article class="death-stat">
+          <div class="death-stat-label">Latest Theme</div>
+          <div class="death-stat-value" id="doom-latest">Loading</div>
+          <div class="death-stat-copy">The newest talking point currently making the rounds.</div>
+        </article>
+        <article class="death-stat">
+          <div class="death-stat-label">Mood</div>
+          <div class="death-stat-value">Still Trolling</div>
+          <div class="death-stat-copy">When the timeline gets noisy, the response is documentation instead of panic.</div>
+        </article>
+      </div>
+
+      <div class="death-sections">
+        <section id="death-chart" class="death-panel" aria-labelledby="death-chart-heading">
+          <div class="death-panel-header">
+            <div>
+              <h3 id="death-chart-heading">$TROLL Price Chart</h3>
+              <p>Live CoinGecko-style line chart pulled from the Solana contract market history.</p>
+            </div>
+          </div>
+          <div class="doom-chart">
+            <div class="chart-toolbar">
+              <div id="chart-toolbar-copy" class="chart-toolbar-copy">Loading CoinGecko market history...</div>
+              <div class="chart-range-pills" aria-label="Chart range">
+                <button class="chart-range-btn" type="button" data-range="30">30D</button>
+                <button class="chart-range-btn" type="button" data-range="90">90D</button>
+                <button class="chart-range-btn is-active" type="button" data-range="365">1Y</button>
+                <button class="chart-range-btn" type="button" data-range="max">MAX</button>
+              </div>
+            </div>
+            <div class="doom-chart-shell">
+              <div id="doom-chart-grid" class="chart-empty">Loading line chart...</div>
+              <div id="chart-events-layer" class="chart-events-layer"></div>
+              <div id="chart-event-popover" class="chart-event-popover" hidden></div>
+            </div>
+            <div id="chart-meta" class="chart-meta"></div>
+            <div id="chart-notes" class="chart-notes"></div>
+          </div>
+        </section>
+
+        <section id="death-timeline" class="death-panel" aria-labelledby="death-timeline-heading">
+          <div class="death-panel-header">
+            <div>
+              <h3 id="death-timeline-heading">Timeline</h3>
+              <p id="timeline-mode-copy">Each row is a moment where the anti-TROLL thesis got loud enough to archive.</p>
+            </div>
+          </div>
+          <div class="timeline-mode-bar" aria-label="Timeline mode">
+            <button id="timeline-mode-fud" class="timeline-mode-btn is-active" type="button">FUD Mode</button>
+            <button id="timeline-mode-guardian" class="timeline-mode-btn" type="button">Guardian Mode</button>
+          </div>
+          <div id="timeline-list" class="timeline-list"></div>
+        </section>
+
+        <section id="death-critics" class="death-panel" aria-labelledby="death-critics-heading">
+          <div class="death-panel-header">
+            <div>
+              <h3 id="death-critics-heading">Critics</h3>
+              <p>Reusable categories for the usual cast of doubters, doomers, and professional vibe-killers.</p>
+            </div>
+          </div>
+          <div id="critics-grid" class="critics-grid"></div>
+        </section>
+      </div>
     </section>
   </div>
   <script>
@@ -754,6 +1373,133 @@ h1 {
     const BALANCE_CACHE_KEY = "troll_stats_cache_v1";
     const CACHE_TTL_MS = 2 * 60 * 1000;
     const STALE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+    const DEFAULT_CHART_RANGE = "365";
+    const TROLL_DEATH_NOTES = [
+      {
+        title: "Chart source",
+        copy: "Price history is fetched from CoinGecko's token-by-contract market chart endpoint for the Solana mint you provided.",
+      },
+      {
+        title: "Timeline sourcing",
+        copy: "The entries below are based on publicly indexed X/Twitter mirrors and public snippets I could verify without logging into X.",
+      },
+      {
+        title: "Why this exists",
+        copy: "The point is to preserve the doom calls next to the market curve, so the receipts stay attached to the chart.",
+      },
+    ];
+    const TROLL_FUD_TIMELINE = [
+      {
+        kind: "fud",
+        date: "Oct. 3, 2025",
+        eventDate: "2025-10-03T15:30:00Z",
+        tags: ["scam", "thread", "distribution"],
+        title: "Scamr calls $TROLL a 'sophisticated scam operation'",
+        copy: "A public X mirror captured Scamr posting a thread that framed the token as more than a meme coin and explicitly treated the mint as a scam case worth dissecting.",
+        sourceLabel: "Open on X",
+        sourceHref: "https://x.com/search?q=(from%3Ascamr_io%20%22sophisticated%20scam%20operation%22%20%245UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2)&src=typed_query",
+      },
+      {
+        kind: "fud",
+        date: "Oct. 6, 2025",
+        eventDate: "2025-10-06T16:05:00Z",
+        tags: ["wallets", "insiders", "fud"],
+        title: "Scamr labels the token 'Insider Central'",
+        copy: "Another indexed post argued that the top wallets and one large holder made the project a 'ticking time bomb,' turning holder distribution into a core anti-TROLL talking point.",
+        sourceLabel: "Open on X",
+        sourceHref: "https://x.com/search?q=(from%3Ascamr_io%20%22Insider%20Central%22%20%22ticking%20time%20bomb%22%20%24TROLL)&src=typed_query",
+      },
+      {
+        kind: "fud",
+        date: "Jan. 27, 2026",
+        eventDate: "2026-01-27T18:10:00Z",
+        tags: ["creator", "skepticism", "ip"],
+        title: "Trollface creator says he does not endorse these coins",
+        copy: "A mirrored post from @saint_whynne reads, 'And this is exactly why I don't endorse these things,' which adds creator-side skepticism directly into the public record.",
+        sourceLabel: "Open on X",
+        sourceHref: "https://x.com/search?q=(from%3Asaint_whynne%20%22And%20this%20is%20exactly%20why%20I%20don%27t%20endorse%20these%20things.%22)&src=typed_query",
+      },
+      {
+        kind: "fud",
+        date: "Jan. 24, 2026",
+        eventDate: "2026-01-24T17:00:00Z",
+        tags: ["creator", "warning", "responsibility"],
+        title: "Whynne warns people not to bet their futures on his posts",
+        copy: "Another public mirror preserved his warning: he is 'not making a community' and people should not stake their financial futures on what he says online.",
+        sourceLabel: "Open on X",
+        sourceHref: "https://x.com/search?q=(from%3Asaint_whynne%20%22I%27m%20not%20making%20a%20community%22%20%22please%20don%27t%20stake%20your%20financial%20futures%22)&src=typed_query",
+      },
+      {
+        kind: "guardian",
+        date: "Sept. 21, 2025",
+        eventDate: "2025-09-21T16:01:00Z",
+        tags: ["backlash", "meta", "community"],
+        title: "Shadow points back at the anti-TROLL pile-on",
+        copy: "A direct X post from @_Shadow36 documents the coin itself and helps anchor the timeline to the exact mint. It works well beside the backlash entries because later community posts explicitly refer back to how many people assumed TROLL was malicious or fake.",
+        sourceLabel: "Open on X",
+        sourceHref: "https://x.com/_Shadow36/status/1969854396076061140",
+      },
+    ];
+    const TROLL_GUARDIAN_TIMELINE = [
+      {
+        kind: "guardian",
+        date: "Sept. 21, 2025",
+        eventDate: "2025-09-21T16:01:00Z",
+        tags: ["defense", "identity", "mint"],
+        title: "Shadow anchors the real mint on X",
+        copy: "This direct post from @_Shadow36 clearly points to the actual Solana mint and gives the chart a clean pro-TROLL marker to contrast against later FUD.",
+        sourceLabel: "Open on X",
+        sourceHref: "https://x.com/_Shadow36/status/1969854396076061140",
+      },
+      {
+        kind: "guardian",
+        date: "Search-linked",
+        eventDate: "2026-02-18T20:00:00Z",
+        tags: ["community", "defense", "100+ likes target"],
+        title: "Shadow praises the TROLL community",
+        copy: "Public mirrors show a Shadow post saying the $TROLL community is one of the best memecoin communities. I could not verify the direct status URL from this environment, so this entry stays X-native via scoped search.",
+        sourceLabel: "Open on X",
+        sourceHref: "https://x.com/search?q=(from%3A_Shadow36%20%22The%20%24troll%20community%20is%20one%20of%20the%20best%20communities%20memecoins%20have%20ever%20seen%22)&src=typed_query",
+      },
+      {
+        kind: "guardian",
+        date: "Search-linked",
+        eventDate: "2026-02-16T19:30:00Z",
+        tags: ["community", "pushback", "defense"],
+        title: "Shadow says people wanted to 'shit on us'",
+        copy: "A mirrored X snippet captures a strong defense of TROLL and directly frames the backlash as bad-faith pile-on from influential accounts.",
+        sourceLabel: "Open on X",
+        sourceHref: "https://x.com/search?q=(from%3A_Shadow36%20%22all%20anyone%20with%20influence%20wanted%20to%20do%20was%20shit%20on%20us%22%20%24troll)&src=typed_query",
+      },
+    ];
+    let activeTimelineMode = "fud";
+    const TROLL_CRITICS = [
+      {
+        type: "The Spreadsheet Maximalist",
+        role: "critic archetype",
+        quote: "If I cannot force it into a neat fundamentals model, it should not exist.",
+        copy: "Treats internet culture as a rounding error and assumes communities have no durable value unless they look corporate.",
+        outcome: "Typical result: underestimates attention, misses momentum, and arrives late once the social layer proves to be the product.",
+      },
+      {
+        type: "The Panic Poster",
+        role: "dip-era specialist",
+        quote: "One ugly candle and suddenly the entire experiment is supposedly finished.",
+        copy: "Lives for red days, posts with maximum certainty, then goes quiet the minute the chart stabilizes.",
+        outcome: "Typical result: becomes an accidental timestamp for local fear while holders keep a screenshot receipt.",
+      },
+      {
+        type: "The Anti-Fun Purist",
+        role: "culture critic",
+        quote: "Serious money should never come wrapped in irony, memes, or troll energy.",
+        copy: "Confuses unfamiliar aesthetics with a lack of resilience and ignores that communities often organize through humor first.",
+        outcome: "Typical result: mocks the vibe, misses the stickiness, and later calls the outcome irrational instead of earned.",
+      },
+    ];
+    let activeChartRange = DEFAULT_CHART_RANGE;
+    let cachedChartSeries = new Map();
+    let latestChartPoints = [];
+    let latestChartMetrics = null;
     let latestTrollUsd = null;
     let cachedTransfers = [];
 
@@ -787,6 +1533,18 @@ h1 {
       const trollUsd = Number(json?.["troll-2"]?.usd || 0);
       if (!trollUsd) throw new Error("CoinGecko missing troll-2 USD price");
       return { trollUsd, source: "CoinGecko" };
+    }
+
+    async function getTrollChart(days) {
+      const cacheKey = String(days);
+      if (cachedChartSeries.has(cacheKey)) return cachedChartSeries.get(cacheKey);
+      const res = await fetch(`https://api.coingecko.com/api/v3/coins/solana/contract/${TROLL_MINT}/market_chart?vs_currency=usd&days=${days}&precision=full`);
+      if (!res.ok) throw new Error(`CoinGecko chart API error (${res.status})`);
+      const json = await res.json();
+      const prices = Array.isArray(json?.prices) ? json.prices : [];
+      if (!prices.length) throw new Error("CoinGecko chart returned no price points");
+      cachedChartSeries.set(cacheKey, prices);
+      return prices;
     }
 
     async function rpcRequest(method, params) {
@@ -1031,6 +1789,333 @@ h1 {
       }).join("");
     }
 
+    function fmtCompactDate(timestamp) {
+      return new Date(timestamp).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+
+    function fmtCompactDateTime(timestamp) {
+      return new Date(timestamp).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    }
+
+    function buildChartSvg(points) {
+      const width = 920;
+      const height = 250;
+      const padding = { top: 12, right: 10, bottom: 24, left: 10 };
+      const prices = points.map((item) => Number(item[1] || 0));
+      const min = Math.min(...prices);
+      const max = Math.max(...prices);
+      const span = max - min || max || 1;
+      const chartWidth = width - padding.left - padding.right;
+      const chartHeight = height - padding.top - padding.bottom;
+      const xFor = (index) => padding.left + (chartWidth * index) / Math.max(points.length - 1, 1);
+      const yFor = (value) => padding.top + ((max - value) / span) * chartHeight;
+      const polyline = points.map((item, index) => `${xFor(index).toFixed(2)},${yFor(Number(item[1] || 0)).toFixed(2)}`).join(" ");
+      const areaPoints = `${padding.left},${height - padding.bottom} ${polyline} ${padding.left + chartWidth},${height - padding.bottom}`;
+      const gridLines = [0, 0.25, 0.5, 0.75, 1].map((step) => {
+        const y = padding.top + chartHeight * step;
+        return `<line class="chart-grid-line" x1="${padding.left}" y1="${y.toFixed(2)}" x2="${(padding.left + chartWidth).toFixed(2)}" y2="${y.toFixed(2)}"></line>`;
+      }).join("");
+      const first = points[0];
+      const last = points[points.length - 1];
+      const lastX = xFor(points.length - 1);
+      const lastY = yFor(Number(last[1] || 0));
+
+      return {
+        svg: `
+        <svg class="doom-chart-grid" viewBox="0 0 ${width} ${height}" role="img" aria-label="$TROLL price history line chart">
+          ${gridLines}
+          <polygon class="chart-area-fill" points="${areaPoints}"></polygon>
+          <polyline class="chart-line" points="${polyline}"></polyline>
+          <circle class="chart-dot" cx="${lastX.toFixed(2)}" cy="${lastY.toFixed(2)}" r="5"></circle>
+          <text class="chart-axis-label" x="${padding.left}" y="${height - 6}">${fmtCompactDate(first[0])}</text>
+          <text class="chart-axis-label" x="${width - padding.right}" y="${height - 6}" text-anchor="end">${fmtCompactDate(last[0])}</text>
+          <text class="chart-axis-label" x="${width - padding.right}" y="${padding.top + 10}" text-anchor="end">$${fmtPrice(max)}</text>
+          <text class="chart-axis-label" x="${width - padding.right}" y="${height - padding.bottom - 4}" text-anchor="end">$${fmtPrice(min)}</text>
+        </svg>
+      `,
+        metrics: {
+          width,
+          height,
+          padding,
+          chartWidth,
+          chartHeight,
+          min,
+          max,
+          xFor,
+          yFor,
+        }
+      };
+    }
+
+    function renderChartMeta(points) {
+      const metaEl = document.getElementById("chart-meta");
+      if (!metaEl) return;
+      const first = Number(points[0]?.[1] || 0);
+      const last = Number(points[points.length - 1]?.[1] || 0);
+      const min = Math.min(...points.map((item) => Number(item[1] || 0)));
+      const max = Math.max(...points.map((item) => Number(item[1] || 0)));
+      const change = first ? ((last - first) / first) * 100 : 0;
+      metaEl.innerHTML = `
+        <article class="chart-meta-card">
+          <div class="chart-meta-label">Latest</div>
+          <div class="chart-meta-value">$${fmtPrice(last)}</div>
+        </article>
+        <article class="chart-meta-card">
+          <div class="chart-meta-label">Range Low</div>
+          <div class="chart-meta-value">$${fmtPrice(min)}</div>
+        </article>
+        <article class="chart-meta-card">
+          <div class="chart-meta-label">Range High</div>
+          <div class="chart-meta-value">$${fmtPrice(max)}</div>
+        </article>
+        <article class="chart-meta-card">
+          <div class="chart-meta-label">Period Change</div>
+          <div class="chart-meta-value">${change >= 0 ? "+" : ""}${change.toFixed(2)}%</div>
+        </article>
+      `;
+    }
+
+    function setActiveChartRange(days) {
+      activeChartRange = String(days);
+      document.querySelectorAll(".chart-range-btn").forEach((button) => {
+        button.classList.toggle("is-active", button.dataset.range === activeChartRange);
+      });
+    }
+
+    function getNearestPoint(points, timestamp) {
+      if (!points.length) return null;
+      let nearest = points[0];
+      let smallestDistance = Math.abs(points[0][0] - timestamp);
+      for (const point of points) {
+        const distance = Math.abs(point[0] - timestamp);
+        if (distance < smallestDistance) {
+          nearest = point;
+          smallestDistance = distance;
+        }
+      }
+      return nearest;
+    }
+
+    function hideChartEventPopover() {
+      const popoverEl = document.getElementById("chart-event-popover");
+      if (!popoverEl) return;
+      popoverEl.hidden = true;
+      popoverEl.innerHTML = "";
+      document.querySelectorAll(".chart-event-node").forEach((node) => node.classList.remove("is-active"));
+    }
+
+    function getReferenceDeathSeries() {
+      return cachedChartSeries.get("365") || cachedChartSeries.get("max") || latestChartPoints;
+    }
+
+    function getActiveTimelineItems() {
+      return activeTimelineMode === "guardian" ? TROLL_GUARDIAN_TIMELINE : TROLL_FUD_TIMELINE;
+    }
+
+    function getAllChartEvents() {
+      return [...TROLL_FUD_TIMELINE, ...TROLL_GUARDIAN_TIMELINE];
+    }
+
+    function renderDeathRollup(currentPrice, fullSeries = getReferenceDeathSeries()) {
+      const countEl = document.getElementById("death-rollup-count");
+      const returnEl = document.getElementById("death-rollup-return");
+      const updatedEl = document.getElementById("death-rollup-updated");
+      if (countEl) countEl.textContent = `${TROLL_FUD_TIMELINE.length}`;
+      if (updatedEl) updatedEl.textContent = fmtCompactDate(Date.now());
+      if (!returnEl || !fullSeries.length || !currentPrice) {
+        if (returnEl) returnEl.textContent = "$0";
+        return;
+      }
+      let totalValue = 0;
+      for (const item of TROLL_FUD_TIMELINE) {
+        const eventTime = new Date(item.eventDate).getTime();
+        const nearest = getNearestPoint(fullSeries, eventTime);
+        const eventPrice = Number(nearest?.[1] || 0);
+        if (!eventPrice) continue;
+        totalValue += (100 / eventPrice) * currentPrice;
+      }
+      returnEl.textContent = `$${Math.round(totalValue).toLocaleString()}`;
+    }
+
+    function renderChartEventNodes(points, metrics) {
+      const layerEl = document.getElementById("chart-events-layer");
+      const popoverEl = document.getElementById("chart-event-popover");
+      if (!layerEl || !popoverEl || !points.length || !metrics) return;
+      layerEl.innerHTML = "";
+      hideChartEventPopover();
+      const pointStart = points[0][0];
+      const pointEnd = points[points.length - 1][0];
+      const shellWidth = layerEl.clientWidth || metrics.width;
+      const shellHeight = layerEl.clientHeight || metrics.height;
+
+      getAllChartEvents().forEach((item) => {
+        const eventTime = new Date(item.eventDate).getTime();
+        if (eventTime < pointStart || eventTime > pointEnd) return;
+        const nearest = getNearestPoint(points, eventTime);
+        if (!nearest) return;
+        const pointIndex = points.findIndex((point) => point[0] === nearest[0] && point[1] === nearest[1]);
+        const xSvg = metrics.xFor(pointIndex);
+        const ySvg = metrics.yFor(Number(nearest[1] || 0));
+        const left = (xSvg / metrics.width) * shellWidth;
+        const top = (ySvg / metrics.height) * shellHeight;
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `chart-event-node ${item.kind === "guardian" ? "chart-event-node-guardian" : "chart-event-node-fud"}`;
+        button.style.left = `${left}px`;
+        button.style.top = `${top}px`;
+        button.setAttribute("aria-label", item.title);
+        button.textContent = item.kind === "guardian" ? "😇" : "💀";
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          document.querySelectorAll(".chart-event-node").forEach((node) => node.classList.remove("is-active"));
+          button.classList.add("is-active");
+          const popoverWidth = Math.min(300, shellWidth - 20);
+          const clampedLeft = Math.max(10, Math.min(left + 16, shellWidth - popoverWidth - 10));
+          const clampedTop = Math.max(10, Math.min(top - 8, shellHeight - 160));
+          popoverEl.style.left = `${clampedLeft}px`;
+          popoverEl.style.top = `${clampedTop}px`;
+          popoverEl.innerHTML = `
+            <div class="chart-event-popover-meta">${fmtCompactDateTime(eventTime)} | ~$${fmtPrice(nearest[1])}</div>
+            <h4>${item.title}</h4>
+            <p>${item.copy}</p>
+            <a class="chart-event-popover-link" href="${item.sourceHref}" target="_blank" rel="noopener noreferrer">${item.sourceLabel}</a>
+          `;
+          popoverEl.hidden = false;
+        });
+        layerEl.appendChild(button);
+      });
+    }
+
+    async function loadTrollChart(days = activeChartRange) {
+      const chartEl = document.getElementById("doom-chart-grid");
+      const toolbarCopyEl = document.getElementById("chart-toolbar-copy");
+      if (!chartEl || !toolbarCopyEl) return;
+      setActiveChartRange(days);
+      chartEl.className = "chart-empty";
+      chartEl.textContent = "Loading line chart...";
+      toolbarCopyEl.textContent = "Requesting CoinGecko contract history...";
+      try {
+        const points = await getTrollChart(days);
+        latestChartPoints = points;
+        chartEl.className = "";
+        const chart = buildChartSvg(points);
+        latestChartMetrics = chart.metrics;
+        chartEl.innerHTML = chart.svg;
+        renderChartMeta(points);
+        renderChartEventNodes(points, chart.metrics);
+        const first = points[0];
+        const last = points[points.length - 1];
+        renderDeathRollup(Number(last?.[1] || 0));
+        toolbarCopyEl.textContent = `CoinGecko contract chart | ${fmtCompactDate(first[0])} to ${fmtCompactDate(last[0])}`;
+      } catch (err) {
+        console.error("Unable to load CoinGecko chart", err);
+        chartEl.className = "chart-empty";
+        chartEl.textContent = "CoinGecko chart unavailable right now.";
+        document.getElementById("chart-meta").innerHTML = "";
+        document.getElementById("chart-events-layer").innerHTML = "";
+        hideChartEventPopover();
+        toolbarCopyEl.textContent = "Unable to load CoinGecko market history.";
+      }
+    }
+
+    function setupChartRangeButtons() {
+      document.querySelectorAll(".chart-range-btn").forEach((button) => {
+        button.addEventListener("click", () => {
+          const nextRange = button.dataset.range || DEFAULT_CHART_RANGE;
+          loadTrollChart(nextRange);
+        });
+      });
+      document.addEventListener("click", (event) => {
+        if (!event.target.closest(".chart-event-node") && !event.target.closest(".chart-event-popover")) {
+          hideChartEventPopover();
+        }
+      });
+      let resizeTimeoutId = null;
+      window.addEventListener("resize", () => {
+        clearTimeout(resizeTimeoutId);
+        resizeTimeoutId = setTimeout(() => {
+          if (latestChartPoints.length) loadTrollChart(activeChartRange);
+        }, 120);
+      });
+    }
+
+    function setTimelineMode(nextMode) {
+      activeTimelineMode = nextMode;
+      document.getElementById("timeline-mode-fud")?.classList.toggle("is-active", nextMode === "fud");
+      document.getElementById("timeline-mode-guardian")?.classList.toggle("is-active", nextMode === "guardian");
+      const copyEl = document.getElementById("timeline-mode-copy");
+      if (copyEl) {
+        copyEl.textContent = nextMode === "guardian"
+          ? "Guardian Mode tracks the higher-signal defenses, community pushback, and pro-TROLL counterposts I could verify."
+          : "Each row is a moment where the anti-TROLL thesis got loud enough to archive.";
+      }
+      renderTrollDeaths();
+    }
+
+    function setupTimelineModeButtons() {
+      document.getElementById("timeline-mode-fud")?.addEventListener("click", () => setTimelineMode("fud"));
+      document.getElementById("timeline-mode-guardian")?.addEventListener("click", () => setTimelineMode("guardian"));
+    }
+
+    function renderTrollDeaths() {
+      const activeItems = getActiveTimelineItems();
+      const latestTheme = TROLL_FUD_TIMELINE[TROLL_FUD_TIMELINE.length - 1]?.title || "Monitoring";
+      const totalEl = document.getElementById("doom-total");
+      const latestEl = document.getElementById("doom-latest");
+      const chartNotesEl = document.getElementById("chart-notes");
+      const timelineEl = document.getElementById("timeline-list");
+      const criticsEl = document.getElementById("critics-grid");
+
+      if (totalEl) totalEl.textContent = TROLL_FUD_TIMELINE.length.toString();
+      if (latestEl) latestEl.textContent = latestTheme;
+
+      if (chartNotesEl) {
+        chartNotesEl.innerHTML = TROLL_DEATH_NOTES.map((item) => `
+          <article class="chart-note">
+            <strong>${item.title}</strong>
+            <span>${item.copy}</span>
+          </article>
+        `).join("");
+      }
+
+      if (timelineEl) {
+        timelineEl.innerHTML = activeItems.map((item) => `
+          <article class="timeline-item">
+            <div class="timeline-date">${item.date}</div>
+            <div class="timeline-card">
+              <div class="timeline-tags">${item.tags.map((tag) => `<span class="timeline-tag">${tag}</span>`).join("")}</div>
+              <h4>${item.title}</h4>
+              <p>${item.copy}</p>
+              <a class="timeline-source" href="${item.sourceHref}" target="_blank" rel="noopener noreferrer">${item.sourceLabel}</a>
+            </div>
+          </article>
+        `).join("");
+      }
+
+      if (criticsEl) {
+        criticsEl.innerHTML = TROLL_CRITICS.map((item) => `
+          <article class="critic-card">
+            <div class="critic-meta">${item.role}</div>
+            <h4>${item.type}</h4>
+            <p class="critic-quote">"${item.quote}"</p>
+            <p>${item.copy}</p>
+            <div class="critic-outcome">${item.outcome}</div>
+          </article>
+        `).join("");
+      }
+    }
+
     async function loadTransfers() {
       const transferStatusEl = document.getElementById("transfer-status");
       try {
@@ -1111,6 +2196,10 @@ h1 {
       });
     }
 
+    renderTrollDeaths();
+    setupChartRangeButtons();
+    setupTimelineModeButtons();
+    loadTrollChart(DEFAULT_CHART_RANGE);
     setupWalletCopyButton();
     applyCachedStats();
 
