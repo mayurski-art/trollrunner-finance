@@ -891,57 +891,16 @@ h1 {
   letter-spacing: 0.06em;
 }
 
-.timeline-card h4,
-.critic-card h4 {
+.timeline-card h4 {
   margin: 0 0 6px;
   font-size: 15px;
 }
 
-.timeline-card p,
-.critic-card p {
+.timeline-card p {
   margin: 0;
   color: var(--muted);
   line-height: 1.6;
   font-size: 14px;
-}
-
-.critics-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.critic-card {
-  padding: 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(126, 255, 142, 0.14);
-  background:
-    linear-gradient(180deg, rgba(126, 255, 142, 0.08), rgba(126, 255, 142, 0.03)),
-    rgba(7, 12, 8, 0.92);
-}
-
-.critic-meta {
-  margin-bottom: 10px;
-  color: var(--accent);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.critic-quote {
-  margin: 0 0 10px;
-  color: var(--text);
-  font-size: 15px;
-  line-height: 1.5;
-}
-
-.critic-outcome {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(126, 255, 142, 0.12);
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .transfers-header {
@@ -1138,7 +1097,7 @@ h1 {
 
 @media (max-width: 860px) {
   .hero-grid { grid-template-columns: 1fr; }
-  .stats, .grid, .death-summary, .chart-notes, .chart-meta, .critics-grid { grid-template-columns: 1fr; }
+  .stats, .grid, .death-summary, .chart-notes, .chart-meta { grid-template-columns: 1fr; }
   .timeline-item { grid-template-columns: 1fr; gap: 8px; }
   h1 { font-size: 28px; }
   .death-ledger-copy h2 { font-size: 24px; }
@@ -1284,7 +1243,6 @@ h1 {
         <nav class="death-ledger-nav" aria-label="Trolldeaths sections">
           <a class="death-pill" href="#death-chart">Chart</a>
           <a class="death-pill" href="#death-timeline">Timeline</a>
-          <a class="death-pill" href="#death-critics">Critics</a>
         </nav>
       </div>
 
@@ -1346,16 +1304,6 @@ h1 {
             <button id="timeline-mode-guardian" class="timeline-mode-btn" type="button">Guardian Mode</button>
           </div>
           <div id="timeline-list" class="timeline-list"></div>
-        </section>
-
-        <section id="death-critics" class="death-panel" aria-labelledby="death-critics-heading">
-          <div class="death-panel-header">
-            <div>
-              <h3 id="death-critics-heading">Critics</h3>
-              <p>Reusable categories for the usual cast of doubters, doomers, and professional vibe-killers.</p>
-            </div>
-          </div>
-          <div id="critics-grid" class="critics-grid"></div>
         </section>
       </div>
     </section>
@@ -1473,29 +1421,6 @@ h1 {
       },
     ];
     let activeTimelineMode = "fud";
-    const TROLL_CRITICS = [
-      {
-        type: "The Spreadsheet Maximalist",
-        role: "critic archetype",
-        quote: "If I cannot force it into a neat fundamentals model, it should not exist.",
-        copy: "Treats internet culture as a rounding error and assumes communities have no durable value unless they look corporate.",
-        outcome: "Typical result: underestimates attention, misses momentum, and arrives late once the social layer proves to be the product.",
-      },
-      {
-        type: "The Panic Poster",
-        role: "dip-era specialist",
-        quote: "One ugly candle and suddenly the entire experiment is supposedly finished.",
-        copy: "Lives for red days, posts with maximum certainty, then goes quiet the minute the chart stabilizes.",
-        outcome: "Typical result: becomes an accidental timestamp for local fear while holders keep a screenshot receipt.",
-      },
-      {
-        type: "The Anti-Fun Purist",
-        role: "culture critic",
-        quote: "Serious money should never come wrapped in irony, memes, or troll energy.",
-        copy: "Confuses unfamiliar aesthetics with a lack of resilience and ignores that communities often organize through humor first.",
-        outcome: "Typical result: mocks the vibe, misses the stickiness, and later calls the outcome irrational instead of earned.",
-      },
-    ];
     let activeChartRange = DEFAULT_CHART_RANGE;
     let cachedChartSeries = new Map();
     let latestChartPoints = [];
@@ -2075,7 +2000,6 @@ h1 {
       const latestEl = document.getElementById("doom-latest");
       const chartNotesEl = document.getElementById("chart-notes");
       const timelineEl = document.getElementById("timeline-list");
-      const criticsEl = document.getElementById("critics-grid");
 
       if (totalEl) totalEl.textContent = TROLL_FUD_TIMELINE.length.toString();
       if (latestEl) latestEl.textContent = latestTheme;
@@ -2103,17 +2027,6 @@ h1 {
         `).join("");
       }
 
-      if (criticsEl) {
-        criticsEl.innerHTML = TROLL_CRITICS.map((item) => `
-          <article class="critic-card">
-            <div class="critic-meta">${item.role}</div>
-            <h4>${item.type}</h4>
-            <p class="critic-quote">"${item.quote}"</p>
-            <p>${item.copy}</p>
-            <div class="critic-outcome">${item.outcome}</div>
-          </article>
-        `).join("");
-      }
     }
 
     async function loadTransfers() {
