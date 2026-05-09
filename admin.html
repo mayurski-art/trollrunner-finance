@@ -610,6 +610,19 @@ textarea:focus {
       node.style.color = isError ? "var(--danger)" : "var(--muted)";
     }
 
+    async function readResponseMessage(response) {
+      try {
+        const payload = await response.clone().json();
+        return payload.message || payload.details || payload.hint || JSON.stringify(payload);
+      } catch {
+        try {
+          return await response.text();
+        } catch {
+          return "";
+        }
+      }
+    }
+
     function resetForm() {
       editingEntryId = null;
       document.getElementById("raw-paste").value = "";
@@ -725,33 +738,68 @@ textarea:focus {
     }
 
     async function saveTimelineToBackend(items) {
-      if (!isSupabaseConfigured()) return false;
-      try {
-        const payload = {
-          id: SUPABASE_ROW_ID,
-          updates: items,
-        };
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?on_conflict=id`, {
-          method: "POST",
-          headers: supabaseHeaders("resolution=merge-duplicates,return=representation"),
-          body: JSON.stringify(payload),
-        });
-        return response.ok;
-      } catch (error) {
-        console.error("Unable to save finance timeline", error);
-        return false;
+      if (!isSupabaseConfigured()) {
+        return { ok: false, message: "Supabase is not configured." };
       }
+      const payload = {
+        id: SUPABASE_ROW_ID,
+        updates: items,
+      };
+      const attempts = [
+        {
+          label: "update existing shared row",
+          method: "PATCH",
+          url: `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?id=eq.${encodeURIComponent(SUPABASE_ROW_ID)}`,
+          options: {
+            method: "PATCH",
+            headers: supabaseHeaders("return=representation"),
+            body: JSON.stringify({ updates: payload.updates }),
+          },
+        },
+        {
+          label: "upsert shared row",
+          method: "POST",
+          url: `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?on_conflict=id`,
+          options: {
+            method: "POST",
+            headers: supabaseHeaders("resolution=merge-duplicates,return=representation"),
+            body: JSON.stringify(payload),
+          },
+        },
+      ];
+      const errors = [];
+      for (const attempt of attempts) {
+        try {
+          const response = await fetch(attempt.url, attempt.options);
+          if (response.ok) {
+            if (attempt.method === "PATCH") {
+              const rows = await response.clone().json().catch(() => []);
+              if (!Array.isArray(rows) || rows.length > 0) return { ok: true };
+              errors.push(`${attempt.label}: no shared row existed yet`);
+              continue;
+            }
+            return { ok: true };
+          }
+          const detail = await readResponseMessage(response);
+          errors.push(`${attempt.label}: ${response.status}${detail ? ` - ${detail}` : ""}`);
+        } catch (error) {
+          errors.push(`${attempt.label}: ${error.message || error}`);
+        }
+      }
+      console.error("Unable to save finance timeline", errors);
+      return { ok: false, message: errors.join(" | ") };
     }
 
     async function persistTimeline() {
       localStorage.setItem(LOCAL_TIMELINE_KEY, JSON.stringify(timelineItems));
-      const saved = await saveTimelineToBackend(timelineItems);
+      const saveResult = await saveTimelineToBackend(timelineItems);
       setStatus(
-        saved
-          ? "Finance timeline synced. The live site can refresh this without another code push."
-          : "Saved on this device, but shared sync failed. The live site will not update elsewhere until backend sync works.",
-        !saved
+        saveResult.ok
+          ? "Finance timeline synced to the shared backend. Other devices should update within about 10 seconds."
+          : `Saved only on this device. Shared sync failed: ${saveResult.message || "check Supabase table policies / network access."}`,
+        !saveResult.ok
       );
+      return saveResult.ok;
     }
 
     async function saveEntry() {
