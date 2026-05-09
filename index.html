@@ -1095,12 +1095,87 @@ h1 {
   border-color: var(--line);
 }
 
+.finance-admin-access {
+  margin-top: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(12, 20, 14, 0.95), rgba(6, 10, 7, 0.95));
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.22);
+}
+
+.finance-admin-copy {
+  max-width: 560px;
+}
+
+.finance-admin-copy strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.finance-admin-copy span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.finance-admin-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.finance-admin-pass {
+  width: 180px;
+  padding: 11px 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 255, 142, 0.3);
+  background: rgba(3, 6, 3, 0.95);
+  color: var(--text);
+  outline: none;
+}
+
+.finance-admin-pass::placeholder {
+  color: rgba(216, 255, 224, 0.45);
+}
+
+.finance-admin-pass:focus {
+  border-color: rgba(126, 255, 142, 0.7);
+  box-shadow: 0 0 0 3px rgba(126, 255, 142, 0.12);
+}
+
+.finance-admin-go {
+  border: 1px solid rgba(126, 255, 142, 0.35);
+  background: rgba(126, 255, 142, 0.12);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 11px 16px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.finance-admin-go:hover {
+  background: rgba(126, 255, 142, 0.2);
+}
+
 @media (max-width: 860px) {
   .hero-grid { grid-template-columns: 1fr; }
   .stats, .grid, .death-summary, .chart-notes, .chart-meta { grid-template-columns: 1fr; }
   .timeline-item { grid-template-columns: 1fr; gap: 8px; }
   h1 { font-size: 28px; }
   .death-ledger-copy h2 { font-size: 24px; }
+  .finance-admin-pass { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1292,7 +1367,7 @@ h1 {
           </div>
         </section>
 
-        <section id="death-timeline" class="death-panel" aria-labelledby="death-timeline-heading">
+    <section id="death-timeline" class="death-panel" aria-labelledby="death-timeline-heading">
           <div class="death-panel-header">
             <div>
               <h3 id="death-timeline-heading">Timeline</h3>
@@ -1307,7 +1382,19 @@ h1 {
         </section>
       </div>
     </section>
+
+    <section class="finance-admin-access" aria-label="Finance admin access">
+      <div class="finance-admin-copy">
+        <strong>Finance Admin Access</strong>
+        <span>Paste tweet receipts into the finance admin panel and the live timeline can refresh without another manual code push.</span>
+      </div>
+      <div class="finance-admin-form" id="admin-access">
+        <input id="admin-pass" class="finance-admin-pass" type="password" placeholder="Admin password" autocomplete="current-password">
+        <button id="admin-go" class="finance-admin-go" type="button">Admin</button>
+      </div>
+    </section>
   </div>
+  <script src="finance-timeline-data.js"></script>
   <script>
     const TROLL_WALLET = "79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA";
     const TROLL_MINT = "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2";
@@ -1610,6 +1697,26 @@ h1 {
         sourceHref: "https://x.com/ProTheDoge/status/2052501165498097922",
       },
     ];
+    const ADMIN_PASSWORD = "#Mayur2626";
+    const ADMIN_AUTH_KEY = "trollrunner_finance_admin_auth";
+    const SUPABASE_URL = "https://tjsyhfplxjtakdfkpdtg.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqc3loZnBseGp0YWtkZmtwZHRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzOTc0ODksImV4cCI6MjA5MTk3MzQ4OX0.xLUcPUUguRBQttNwiIRWJHxjJjLqrQDMu4Ubsk5yZoQ";
+    const SUPABASE_ANON_KEY_PLACEHOLDER = "your_anon_public_key";
+    const SUPABASE_TABLE = "site_updates";
+    const SUPABASE_ROW_ID = "finance_timeline";
+    const TIMELINE_POLL_MS = 10000;
+    const LOCAL_TIMELINE_KEY = "trollrunner_finance_timeline_cache";
+    const ADMIN_PASSWORD_TROLL_MESSAGES = [
+      "Wrong password. The receipts stay locked.",
+      "That password is not financing the timeline.",
+      "Admin access denied. Come back with the real troll credentials.",
+      "Still wrong. The tweet vault remains sealed."
+    ];
+    const DEFAULT_TIMELINE_ITEMS = [
+      ...TROLL_FUD_TIMELINE.map((item) => ({ ...item })),
+      ...TROLL_GUARDIAN_TIMELINE.map((item) => ({ ...item })),
+    ];
+    let financeTimelineItems = DEFAULT_TIMELINE_ITEMS.map((item) => ({ ...item, tags: Array.isArray(item.tags) ? [...item.tags] : [] }));
     let activeTimelineMode = "fud";
     let activeChartRange = DEFAULT_CHART_RANGE;
     let cachedChartSeries = new Map();
@@ -1639,6 +1746,137 @@ h1 {
         minimumFractionDigits: 2,
         maximumFractionDigits: fractionDigits,
       });
+    }
+
+    function isSupabaseConfigured() {
+      return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_ANON_KEY !== SUPABASE_ANON_KEY_PLACEHOLDER);
+    }
+
+    function supabaseHeaders(prefer = "return=representation") {
+      return {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: prefer,
+      };
+    }
+
+    function formatTimelineDisplayDate(value) {
+      const parsed = new Date(value || Date.now());
+      if (Number.isNaN(parsed.getTime())) return "Unknown date";
+      const month = parsed.toLocaleString(undefined, { month: "short" }).replace(".", "");
+      return `${month}. ${parsed.getDate()}, ${parsed.getFullYear()}`;
+    }
+
+    function normalizeTimelineItem(item) {
+      if (!item || typeof item !== "object") return null;
+      const rawKind = String(item.kind || "fud").toLowerCase();
+      const kind = rawKind === "guardian" ? "guardian" : "fud";
+      const eventDateValue = item.eventDate || item.createdAt || new Date().toISOString();
+      const eventDate = new Date(eventDateValue);
+      const finalEventDate = Number.isNaN(eventDate.getTime()) ? new Date().toISOString() : eventDate.toISOString();
+      const sourceHref = String(item.sourceHref || "").trim();
+      const sourceLabel = String(item.sourceLabel || (sourceHref.includes("x.com") || sourceHref.includes("twitter.com") ? "Open on X" : "Open source")).trim() || "Open source";
+      const tags = Array.isArray(item.tags)
+        ? item.tags.map((tag) => String(tag || "").trim()).filter(Boolean).slice(0, 4)
+        : [];
+      const title = String(item.title || "").trim();
+      const copy = String(item.copy || "").trim();
+      if (!title || !copy) return null;
+      return {
+        id: String(item.id || `${kind}-${finalEventDate}-${title}`).trim(),
+        kind,
+        date: String(item.date || formatTimelineDisplayDate(finalEventDate)).trim(),
+        eventDate: finalEventDate,
+        tags,
+        title,
+        copy,
+        sourceLabel,
+        sourceHref: sourceHref || "#",
+      };
+    }
+
+    function sortTimelineItems(items) {
+      return [...items].sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
+    }
+
+    function cloneNormalizedTimeline(items) {
+      return items
+        .map((item) => normalizeTimelineItem(item))
+        .filter(Boolean)
+        .map((item) => ({ ...item, tags: [...item.tags] }));
+    }
+
+    function getStoredTimelineItems() {
+      try {
+        const raw = localStorage.getItem(LOCAL_TIMELINE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return null;
+        const normalized = cloneNormalizedTimeline(parsed);
+        return normalized.length ? normalized : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function setFinanceTimelineItems(items, { persist = true } = {}) {
+      const normalized = cloneNormalizedTimeline(items);
+      financeTimelineItems = normalized.length ? normalized : cloneNormalizedTimeline(DEFAULT_TIMELINE_ITEMS);
+      if (persist) {
+        try {
+          localStorage.setItem(LOCAL_TIMELINE_KEY, JSON.stringify(financeTimelineItems));
+        } catch {}
+      }
+    }
+
+    async function loadFinanceTimelineFromBackend() {
+      if (!isSupabaseConfigured()) return null;
+      try {
+        const qs = new URLSearchParams({
+          select: "updates",
+          id: `eq.${SUPABASE_ROW_ID}`,
+          limit: "1",
+        });
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?${qs.toString()}`, {
+          headers: supabaseHeaders("return=minimal"),
+          cache: "no-store",
+        });
+        if (!response.ok) return null;
+        const payload = await response.json();
+        const row = Array.isArray(payload) ? payload[0] : payload;
+        if (!row || !Array.isArray(row.updates)) return null;
+        const normalized = cloneNormalizedTimeline(row.updates);
+        return normalized.length ? normalized : null;
+      } catch (error) {
+        console.error("Unable to load finance timeline from Supabase", error);
+        return null;
+      }
+    }
+
+    async function refreshFinanceTimelineFromBackend() {
+      const remote = await loadFinanceTimelineFromBackend();
+      if (!remote) return;
+      setFinanceTimelineItems(remote);
+      renderTrollDeaths();
+      if (latestChartPoints.length && latestChartMetrics) {
+        renderChartEventNodes(latestChartPoints, latestChartMetrics);
+        renderDeathRollup(Number(latestChartPoints[latestChartPoints.length - 1]?.[1] || 0));
+      }
+    }
+
+    function goToFinanceAdmin() {
+      const input = document.getElementById("admin-pass");
+      const pass = input ? input.value : "";
+      if (pass !== ADMIN_PASSWORD) {
+        goToFinanceAdmin.failedAttempts = (goToFinanceAdmin.failedAttempts || 0) + 1;
+        const idx = Math.min(goToFinanceAdmin.failedAttempts - 1, ADMIN_PASSWORD_TROLL_MESSAGES.length - 1);
+        window.alert(ADMIN_PASSWORD_TROLL_MESSAGES[idx]);
+        return;
+      }
+      goToFinanceAdmin.failedAttempts = 0;
+      localStorage.setItem(ADMIN_AUTH_KEY, "1");
+      window.location.href = "admin.html";
     }
 
     async function getTrollPrice() {
@@ -2034,25 +2272,27 @@ h1 {
     }
 
     function getActiveTimelineItems() {
-      return activeTimelineMode === "guardian" ? TROLL_GUARDIAN_TIMELINE : TROLL_FUD_TIMELINE;
+      const targetKind = activeTimelineMode === "guardian" ? "guardian" : "fud";
+      return sortTimelineItems(financeTimelineItems.filter((item) => item.kind === targetKind));
     }
 
     function getAllChartEvents() {
-      return [...TROLL_FUD_TIMELINE, ...TROLL_GUARDIAN_TIMELINE];
+      return sortTimelineItems(financeTimelineItems);
     }
 
     function renderDeathRollup(currentPrice, fullSeries = getReferenceDeathSeries()) {
+      const fudItems = financeTimelineItems.filter((item) => item.kind === "fud");
       const countEl = document.getElementById("death-rollup-count");
       const returnEl = document.getElementById("death-rollup-return");
       const updatedEl = document.getElementById("death-rollup-updated");
-      if (countEl) countEl.textContent = `${TROLL_FUD_TIMELINE.length}`;
+      if (countEl) countEl.textContent = `${fudItems.length}`;
       if (updatedEl) updatedEl.textContent = fmtCompactDate(Date.now());
       if (!returnEl || !fullSeries.length || !currentPrice) {
         if (returnEl) returnEl.textContent = "$0";
         return;
       }
       let totalValue = 0;
-      for (const item of TROLL_FUD_TIMELINE) {
+      for (const item of fudItems) {
         const eventTime = new Date(item.eventDate).getTime();
         const nearest = getNearestPoint(fullSeries, eventTime);
         const eventPrice = Number(nearest?.[1] || 0);
@@ -2185,13 +2425,14 @@ h1 {
 
     function renderTrollDeaths() {
       const activeItems = getActiveTimelineItems();
-      const latestTheme = TROLL_FUD_TIMELINE[TROLL_FUD_TIMELINE.length - 1]?.title || "Monitoring";
+      const fudItems = sortTimelineItems(financeTimelineItems.filter((item) => item.kind === "fud"));
+      const latestTheme = fudItems[0]?.title || "Monitoring";
       const totalEl = document.getElementById("doom-total");
       const latestEl = document.getElementById("doom-latest");
       const chartNotesEl = document.getElementById("chart-notes");
       const timelineEl = document.getElementById("timeline-list");
 
-      if (totalEl) totalEl.textContent = TROLL_FUD_TIMELINE.length.toString();
+      if (totalEl) totalEl.textContent = fudItems.length.toString();
       if (latestEl) latestEl.textContent = latestTheme;
 
       if (chartNotesEl) {
@@ -2299,6 +2540,16 @@ h1 {
       });
     }
 
+    const localTimelineItems = getStoredTimelineItems();
+    if (localTimelineItems) {
+      setFinanceTimelineItems(localTimelineItems, { persist: false });
+    }
+
+    document.getElementById("admin-go")?.addEventListener("click", goToFinanceAdmin);
+    document.getElementById("admin-pass")?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") goToFinanceAdmin();
+    });
+
     renderTrollDeaths();
     setupChartRangeButtons();
     setupTimelineModeButtons();
@@ -2310,6 +2561,11 @@ h1 {
       // If price resolved after transfers rendered, refresh USD estimations.
       if (latestTrollUsd) loadTransfers();
     });
+
+    refreshFinanceTimelineFromBackend();
+    if (isSupabaseConfigured()) {
+      window.setInterval(refreshFinanceTimelineFromBackend, TIMELINE_POLL_MS);
+    }
   </script>
 </body>
 </html>
