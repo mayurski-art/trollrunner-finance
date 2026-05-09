@@ -245,11 +245,11 @@ textarea:focus {
     <div class="grid">
       <section class="panel">
         <h2>New Timeline Entry</h2>
-        <p class="helper">Fast path: paste the tweet text and link into the big box, choose FUD or Guardian, click <strong>Parse Paste</strong>, then save.</p>
+        <p class="helper">Fast path: paste the tweet link (or the full tweet text plus link), choose FUD or Guardian, click <strong>Parse Paste</strong>, then save. Tweet links auto-detect the X timestamp and try to pull the live text for title, body, and tags.</p>
 
         <div class="field">
           <label for="raw-paste">Tweet Paste</label>
-          <textarea id="raw-paste" placeholder="Paste the tweet text, the X link, and any timestamp line here."></textarea>
+          <textarea id="raw-paste" placeholder="Paste a tweet URL, or paste the tweet text, X link, and any timestamp line here."></textarea>
         </div>
 
         <div class="split">
@@ -410,88 +410,217 @@ textarea:focus {
       const text = String(copy || "").toLowerCase();
       const orderedTags = [];
       const tagMap = [
-        ["zero", ["going to zero", "zero"]],
-        ["conviction", ["conviction", "believe", "belief"]],
-        ["community", ["community", "holders", "holder"]],
-        ["chart", ["chart", "candles", "price"]],
-        ["billions", ["billion", "billions"]],
-        ["bagwork", ["bagwork", "run", "miles"]],
-        ["funding", ["airdrop", "fund", "funding"]],
-        ["execution", ["execution", "team", "roadmap"]],
+        ["zero", ["going to zero", "zero", "dead", "death"]],
+        ["conviction", ["conviction", "believe", "belief", "holding", "diamond"]],
+        ["community", ["community", "holders", "holder", "cult", "army"]],
+        ["chart", ["chart", "candles", "price", "market cap", "mcap"]],
+        ["billions", ["billion", "billions", "9 figure", "10 figure"]],
+        ["bagwork", ["bagwork", "run", "running", "miles", "irl"]],
+        ["funding", ["airdrop", "fund", "funding", "paid"]],
+        ["execution", ["execution", "team", "roadmap", "cto", "deliver"]],
+        ["memecoin", ["meme", "memecoin", "coin"]],
+        ["influencer", ["influencer", "kol", "shill"]],
       ];
       for (const [tag, needles] of tagMap) {
         if (needles.some((needle) => text.includes(needle))) orderedTags.push(tag);
       }
       if (kind === "guardian" && !orderedTags.includes("community")) orderedTags.push("community");
       if (kind === "fud" && !orderedTags.includes("zero")) orderedTags.push("zero");
-      return [...new Set(orderedTags)].slice(0, 3);
+      return [...new Set(orderedTags)].slice(0, 4);
     }
 
-    function summarizeTitle(copy, handle, kind) {
+    function summarizeTitle(copy, handle, kind, fallbackDate = "") {
       const clean = String(copy || "").replace(/\s+/g, " ").trim();
-      const snippet = clean.split(/[.!?]/)[0].trim() || clean;
+      const fallback = fallbackDate ? `Receipt from ${formatDisplayDate(fallbackDate)}` : (kind === "guardian" ? "Guardian receipt" : "FUD receipt");
+      const snippet = clean.split(/[.!?]/)[0].trim() || clean || fallback;
       const short = snippet.length > 68 ? `${snippet.slice(0, 65).trim()}...` : snippet;
       return `${handle || (kind === "guardian" ? "Guardian receipt" : "FUD receipt")}: ${short}`;
     }
 
+    function stripTrackingFromUrl(url) {
+      try {
+        const parsed = new URL(url);
+        parsed.hash = "";
+        parsed.search = "";
+        return parsed.toString();
+      } catch {
+        return String(url || "").split(/[?#]/)[0];
+      }
+    }
+
     function extractFirstUrl(text) {
       const match = String(text || "").match(/https?:\/\/\S+/i);
-      return match ? match[0].replace(/[)\].,]+$/, "") : "";
+      return match ? stripTrackingFromUrl(match[0].replace(/[)\].,]+$/, "")) : "";
+    }
+
+    function extractTweetId(text) {
+      const match = String(text || "").match(/(?:status|statuses)\/(\d{15,25})|\b(\d{15,25})\b/i);
+      return match ? (match[1] || match[2]) : "";
     }
 
     function extractHandle(text, sourceHref) {
       const urlMatch = String(sourceHref || "").match(/(?:x|twitter)\.com\/([A-Za-z0-9_]+)/i);
-      if (urlMatch) return urlMatch[1];
+      if (urlMatch && !["i", "intent", "share"].includes(urlMatch[1].toLowerCase())) return urlMatch[1];
       const textMatch = String(text || "").match(/@([A-Za-z0-9_]{2,20})/);
       return textMatch ? textMatch[1] : "";
+    }
+
+    function dateFromTweetId(tweetId) {
+      try {
+        if (!/^\d{15,25}$/.test(String(tweetId || ""))) return "";
+        const twitterEpoch = 1288834974657n;
+        const timestamp = (BigInt(tweetId) >> 22n) + twitterEpoch;
+        const parsed = new Date(Number(timestamp));
+        return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
+      } catch {
+        return "";
+      }
+    }
+
+    function parseLooseDate(value) {
+      const cleaned = String(value || "").replace("·", " ").replace(/\bat\b/i, " ").replace(/\s+/g, " ").trim();
+      const parsed = new Date(cleaned);
+      return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
     }
 
     function extractDate(text) {
       const patterns = [
         /\b\d{1,2}:\d{2}\s?(?:AM|PM)\s*[·|-]?\s*[A-Za-z]{3,9}\.?\s+\d{1,2},\s+\d{4}\b/i,
+        /\b[A-Za-z]{3,9}\.?\s+\d{1,2},\s+\d{4}\s*(?:at)?\s*\d{1,2}:\d{2}\s?(?:AM|PM)?\b/i,
         /\b[A-Za-z]{3,9}\.?\s+\d{1,2},\s+\d{4}\b/i,
-        /\b\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?\b/,
+        /\b\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})?)?\b/,
         /\b\d{1,2}\/\d{1,2}\/\d{4}\b/,
       ];
       for (const pattern of patterns) {
         const match = String(text || "").match(pattern);
         if (!match) continue;
-        const parsed = new Date(match[0].replace("·", " "));
-        if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+        const parsed = parseLooseDate(match[0]);
+        if (parsed) return parsed;
       }
-      return new Date().toISOString();
+      return dateFromTweetId(extractTweetId(text)) || new Date().toISOString();
     }
 
-    function parseTweetPaste(rawText, kind) {
-      const sourceHref = extractFirstUrl(rawText);
+    function cleanTweetCopy(rawText, sourceHref = "") {
       const handle = extractHandle(rawText, sourceHref);
+      const skipPatterns = [
+        /^https?:\/\//i,
+        /^\d+\s*(reposts?|quotes?|likes?|bookmarks?|views?)$/i,
+        /^(replying to|from|translate post|show more|view post engagements)$/i,
+        /^\d{1,2}:\d{2}\s?(?:AM|PM)\s*[·|-]?\s*[A-Za-z]{3,9}\.?\s+\d{1,2},\s+\d{4}$/i,
+        /^[A-Za-z]{3,9}\.?\s+\d{1,2},\s+\d{4}/i,
+      ];
       const lines = String(rawText || "")
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean)
-        .filter((line) => !/^https?:\/\//i.test(line));
-      const cleanedText = lines
+        .filter((line) => !skipPatterns.some((pattern) => pattern.test(line)))
+        .filter((line) => line !== handle && line !== `@${handle}`);
+      return lines
         .join(" ")
         .replace(/\s+/g, " ")
-        .replace(/^\@\w+\s+/, "")
+        .replace(/^@\w+\s+/, "")
         .trim();
-      const copy = cleanedText || String(rawText || "").trim();
-      const eventDate = extractDate(rawText);
+    }
+
+    function parseTweetPaste(rawText, kind, fetchedTweet = null) {
+      const sourceHref = fetchedTweet?.sourceHref || extractFirstUrl(rawText);
+      const tweetId = extractTweetId(sourceHref || rawText);
+      const handle = fetchedTweet?.handle || extractHandle(rawText, sourceHref);
+      const fetchedText = String(fetchedTweet?.text || "").trim();
+      const cleanedText = fetchedText || cleanTweetCopy(rawText, sourceHref);
+      const eventDate = fetchedTweet?.eventDate || extractDate(rawText) || dateFromTweetId(tweetId) || new Date().toISOString();
+      const hasCopy = Boolean(cleanedText);
+      const copy = hasCopy
+        ? cleanedText
+        : (sourceHref ? `Tweet link captured. Paste the tweet text too if X blocks the live text fetch: ${sourceHref}` : String(rawText || "").trim());
       return {
         kind,
         eventDate,
-        title: summarizeTitle(copy, handle, kind),
+        title: summarizeTitle(hasCopy ? copy : "", handle, kind, eventDate),
         copy,
-        tags: deriveTags(copy, kind),
+        tags: deriveTags(hasCopy ? copy : "", kind),
         sourceLabel: sourceHref && (sourceHref.includes("x.com") || sourceHref.includes("twitter.com")) ? "Open on X" : "Open source",
         sourceHref,
       };
+    }
+
+    function normalizeFetchedTweet(payload, sourceHref) {
+      if (!payload || typeof payload !== "object") return null;
+      const tweet = payload.tweet || payload;
+      const user = tweet.user || tweet.author || payload.author || {};
+      const text = tweet.text || tweet.full_text || tweet.content || tweet.description || payload.text || "";
+      const handle = user.screen_name || user.username || user.handle || tweet.screen_name || tweet.username || payload.screen_name || "";
+      const rawDate = tweet.created_at || tweet.createdAt || tweet.date || tweet.date_epoch || payload.created_at || payload.createdAt || payload.date;
+      const numericDate = /^\d+$/.test(String(rawDate || "")) ? Number(rawDate) : NaN;
+      const eventDate = Number.isFinite(numericDate)
+        ? new Date(numericDate * (numericDate < 10000000000 ? 1000 : 1)).toISOString()
+        : parseLooseDate(rawDate);
+      if (!text && !eventDate && !handle) return null;
+      return { text, handle: String(handle || "").replace(/^@/, ""), eventDate, sourceHref };
+    }
+
+    function extractTweetFromOembed(html, sourceHref) {
+      const decoded = String(html || "")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\s+/g, " ")
+        .trim();
+      const text = decoded.replace(/—\s*[^(@]+\(@[^)]+\)\s*[A-Za-z]+\s+\d{1,2},\s+\d{4}.*/i, "").trim();
+      return text ? { text, sourceHref } : null;
+    }
+
+    async function fetchJson(url) {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`Tweet fetch failed: ${response.status}`);
+      return response.json();
+    }
+
+    async function fetchTweetMetadata(rawText) {
+      const sourceHref = extractFirstUrl(rawText);
+      const tweetId = extractTweetId(sourceHref || rawText);
+      if (!tweetId) return null;
+      const encodedSource = encodeURIComponent(sourceHref || `https://x.com/i/status/${tweetId}`);
+      const candidates = [
+        () => fetchJson(`https://cdn.syndication.twimg.com/tweet-result?id=${tweetId}&lang=en`).then((payload) => normalizeFetchedTweet(payload, sourceHref)),
+        () => fetchJson(`https://api.fxtwitter.com/status/${tweetId}`).then((payload) => normalizeFetchedTweet(payload, sourceHref)),
+        () => fetchJson(`https://api.vxtwitter.com/i/status/${tweetId}`).then((payload) => normalizeFetchedTweet(payload, sourceHref)),
+        () => fetchJson(`https://publish.twitter.com/oembed?omit_script=1&dnt=1&url=${encodedSource}`).then((payload) => extractTweetFromOembed(payload.html, sourceHref)),
+      ];
+      let fallbackTweet = null;
+      for (const candidate of candidates) {
+        try {
+          const tweet = await candidate();
+          if (tweet?.text) return { ...tweet, eventDate: tweet.eventDate || dateFromTweetId(tweetId) };
+          if (tweet?.eventDate && !fallbackTweet) fallbackTweet = tweet;
+        } catch (error) {
+          console.debug("Tweet metadata fetch candidate failed", error);
+        }
+      }
+      return fallbackTweet || { eventDate: dateFromTweetId(tweetId), sourceHref };
     }
 
     function setStatus(message, isError = false) {
       const node = document.getElementById("sync-status");
       node.textContent = message;
       node.style.color = isError ? "var(--danger)" : "var(--muted)";
+    }
+
+    async function readResponseMessage(response) {
+      try {
+        const payload = await response.clone().json();
+        return payload.message || payload.details || payload.hint || JSON.stringify(payload);
+      } catch {
+        try {
+          return await response.text();
+        } catch {
+          return "";
+        }
+      }
     }
 
     function resetForm() {
@@ -609,33 +738,68 @@ textarea:focus {
     }
 
     async function saveTimelineToBackend(items) {
-      if (!isSupabaseConfigured()) return false;
-      try {
-        const payload = {
-          id: SUPABASE_ROW_ID,
-          updates: items,
-        };
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?on_conflict=id`, {
-          method: "POST",
-          headers: supabaseHeaders("resolution=merge-duplicates,return=representation"),
-          body: JSON.stringify(payload),
-        });
-        return response.ok;
-      } catch (error) {
-        console.error("Unable to save finance timeline", error);
-        return false;
+      if (!isSupabaseConfigured()) {
+        return { ok: false, message: "Supabase is not configured." };
       }
+      const payload = {
+        id: SUPABASE_ROW_ID,
+        updates: items,
+      };
+      const attempts = [
+        {
+          label: "update existing shared row",
+          method: "PATCH",
+          url: `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?id=eq.${encodeURIComponent(SUPABASE_ROW_ID)}`,
+          options: {
+            method: "PATCH",
+            headers: supabaseHeaders("return=representation"),
+            body: JSON.stringify({ updates: payload.updates }),
+          },
+        },
+        {
+          label: "upsert shared row",
+          method: "POST",
+          url: `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?on_conflict=id`,
+          options: {
+            method: "POST",
+            headers: supabaseHeaders("resolution=merge-duplicates,return=representation"),
+            body: JSON.stringify(payload),
+          },
+        },
+      ];
+      const errors = [];
+      for (const attempt of attempts) {
+        try {
+          const response = await fetch(attempt.url, attempt.options);
+          if (response.ok) {
+            if (attempt.method === "PATCH") {
+              const rows = await response.clone().json().catch(() => []);
+              if (!Array.isArray(rows) || rows.length > 0) return { ok: true };
+              errors.push(`${attempt.label}: no shared row existed yet`);
+              continue;
+            }
+            return { ok: true };
+          }
+          const detail = await readResponseMessage(response);
+          errors.push(`${attempt.label}: ${response.status}${detail ? ` - ${detail}` : ""}`);
+        } catch (error) {
+          errors.push(`${attempt.label}: ${error.message || error}`);
+        }
+      }
+      console.error("Unable to save finance timeline", errors);
+      return { ok: false, message: errors.join(" | ") };
     }
 
     async function persistTimeline() {
       localStorage.setItem(LOCAL_TIMELINE_KEY, JSON.stringify(timelineItems));
-      const saved = await saveTimelineToBackend(timelineItems);
+      const saveResult = await saveTimelineToBackend(timelineItems);
       setStatus(
-        saved
-          ? "Finance timeline synced. The live site can refresh this without another code push."
-          : "Saved on this device, but shared sync failed. The live site will not update elsewhere until backend sync works.",
-        !saved
+        saveResult.ok
+          ? "Finance timeline synced to the shared backend. Other devices should update within about 10 seconds."
+          : `Saved only on this device. Shared sync failed: ${saveResult.message || "check Supabase table policies / network access."}`,
+        !saveResult.ok
       );
+      return saveResult.ok;
     }
 
     async function saveEntry() {
@@ -671,22 +835,35 @@ textarea:focus {
       if (editingEntryId === id) resetForm();
     }
 
-    function parsePasteIntoForm() {
+    async function parsePasteIntoForm() {
       const rawText = document.getElementById("raw-paste").value.trim();
       const kind = document.getElementById("entry-kind").value;
       if (!rawText) {
-        setStatus("Paste tweet text or a receipt block first.", true);
+        setStatus("Paste tweet text, a tweet URL, or a receipt block first.", true);
         return;
       }
-      const parsed = parseTweetPaste(rawText, kind);
-      document.getElementById("entry-date").value = toDatetimeLocalValue(parsed.eventDate);
-      document.getElementById("entry-title").value = parsed.title;
-      document.getElementById("entry-copy").value = parsed.copy;
-      document.getElementById("entry-tags").value = parsed.tags.join(", ");
-      document.getElementById("entry-source-label").value = parsed.sourceLabel;
-      document.getElementById("entry-source-href").value = parsed.sourceHref;
-      renderPreview();
-      setStatus("Paste parsed. Review the fields and save when ready.");
+      const parseButton = document.getElementById("parse-btn");
+      parseButton.disabled = true;
+      try {
+        setStatus("Parsing paste and checking the tweet link...");
+        const fetchedTweet = await fetchTweetMetadata(rawText);
+        const parsed = parseTweetPaste(rawText, kind, fetchedTweet);
+        document.getElementById("entry-date").value = toDatetimeLocalValue(parsed.eventDate);
+        document.getElementById("entry-title").value = parsed.title;
+        document.getElementById("entry-copy").value = parsed.copy;
+        document.getElementById("entry-tags").value = parsed.tags.join(", ");
+        document.getElementById("entry-source-label").value = parsed.sourceLabel;
+        document.getElementById("entry-source-href").value = parsed.sourceHref;
+        renderPreview();
+        setStatus(
+          fetchedTweet?.text
+            ? "Tweet parsed from the link. Review the fields and save when ready."
+            : "Tweet link parsed from its ID. If body text is missing, paste the tweet text too and parse again.",
+          !fetchedTweet?.text
+        );
+      } finally {
+        parseButton.disabled = false;
+      }
     }
 
     async function boot() {
