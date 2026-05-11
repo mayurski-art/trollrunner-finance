@@ -2541,7 +2541,7 @@ h1 {
     }
 
     const localTimelineItems = getStoredTimelineItems();
-    if (localTimelineItems) {
+    if (localTimelineItems && !isSupabaseConfigured()) {
       setFinanceTimelineItems(localTimelineItems, { persist: false });
     }
 

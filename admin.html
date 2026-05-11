@@ -791,12 +791,14 @@ textarea:focus {
     }
 
     async function persistTimeline() {
-      localStorage.setItem(LOCAL_TIMELINE_KEY, JSON.stringify(timelineItems));
       const saveResult = await saveTimelineToBackend(timelineItems);
+      if (saveResult.ok) {
+        localStorage.setItem(LOCAL_TIMELINE_KEY, JSON.stringify(timelineItems));
+      }
       setStatus(
         saveResult.ok
           ? "Finance timeline synced to the shared backend. Other devices should update within about 10 seconds."
-          : `Saved only on this device. Shared sync failed: ${saveResult.message || "check Supabase table policies / network access."}`,
+          : `Shared sync failed, so these edits were not promoted as the live cross-device timeline yet. ${saveResult.message || "Check Supabase table policies / network access."}`,
         !saveResult.ok
       );
       return saveResult.ok;
@@ -811,8 +813,11 @@ textarea:focus {
       const nextItems = timelineItems.filter((item) => item.id !== entry.id);
       nextItems.push(entry);
       timelineItems = cloneTimelineItems(nextItems);
-      await persistTimeline();
+      const saved = await persistTimeline();
       renderEntries();
+      if (!saved) {
+        alert("Supabase sync failed, so this tweet is only in the current admin session and is not live on other devices yet.");
+      }
       resetForm();
     }
 
@@ -830,8 +835,11 @@ textarea:focus {
       if (!entry) return;
       if (!window.confirm(`Delete "${entry.title}"?`)) return;
       timelineItems = timelineItems.filter((item) => item.id !== id);
-      await persistTimeline();
+      const saved = await persistTimeline();
       renderEntries();
+      if (!saved) {
+        alert("Supabase sync failed, so this delete is not live on other devices yet.");
+      }
       if (editingEntryId === id) resetForm();
     }
 
