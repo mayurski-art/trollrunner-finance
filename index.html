@@ -1712,10 +1712,12 @@ h1 {
       "Admin access denied. Come back with the real troll credentials.",
       "Still wrong. The tweet vault remains sealed."
     ];
-    const DEFAULT_TIMELINE_ITEMS = [
-      ...TROLL_FUD_TIMELINE.map((item) => ({ ...item })),
-      ...TROLL_GUARDIAN_TIMELINE.map((item) => ({ ...item })),
-    ];
+    const DEFAULT_TIMELINE_ITEMS = cloneNormalizedTimeline(window.FINANCE_TIMELINE_SEED || []).length
+      ? cloneNormalizedTimeline(window.FINANCE_TIMELINE_SEED || [])
+      : [
+          ...TROLL_FUD_TIMELINE.map((item) => ({ ...item })),
+          ...TROLL_GUARDIAN_TIMELINE.map((item) => ({ ...item })),
+        ];
     let financeTimelineItems = DEFAULT_TIMELINE_ITEMS.map((item) => ({ ...item, tags: Array.isArray(item.tags) ? [...item.tags] : [] }));
     let activeTimelineMode = "fud";
     let activeChartRange = DEFAULT_CHART_RANGE;
@@ -1807,6 +1809,16 @@ h1 {
         .map((item) => ({ ...item, tags: [...item.tags] }));
     }
 
+    function mergeTimelineItems(...groups) {
+      const merged = new Map();
+      for (const group of groups) {
+        for (const item of cloneNormalizedTimeline(Array.isArray(group) ? group : [])) {
+          merged.set(item.id, item);
+        }
+      }
+      return sortTimelineItems(Array.from(merged.values()));
+    }
+
     function getStoredTimelineItems() {
       try {
         const raw = localStorage.getItem(LOCAL_TIMELINE_KEY);
@@ -1857,7 +1869,7 @@ h1 {
     async function refreshFinanceTimelineFromBackend() {
       const remote = await loadFinanceTimelineFromBackend();
       if (!remote) return;
-      setFinanceTimelineItems(remote);
+      setFinanceTimelineItems(mergeTimelineItems(DEFAULT_TIMELINE_ITEMS, remote));
       renderTrollDeaths();
       if (latestChartPoints.length && latestChartMetrics) {
         renderChartEventNodes(latestChartPoints, latestChartMetrics);
@@ -2540,15 +2552,13 @@ h1 {
       });
     }
 
-    const localTimelineItems = getStoredTimelineItems();
-    if (localTimelineItems && !isSupabaseConfigured()) {
-      setFinanceTimelineItems(localTimelineItems, { persist: false });
-    }
-
     document.getElementById("admin-go")?.addEventListener("click", goToFinanceAdmin);
     document.getElementById("admin-pass")?.addEventListener("keydown", (event) => {
       if (event.key === "Enter") goToFinanceAdmin();
     });
+
+    const localTimelineItems = getStoredTimelineItems();
+    setFinanceTimelineItems(mergeTimelineItems(DEFAULT_TIMELINE_ITEMS, localTimelineItems || []), { persist: false });
 
     renderTrollDeaths();
     setupChartRangeButtons();
@@ -2556,6 +2566,16 @@ h1 {
     loadTrollChart(DEFAULT_CHART_RANGE);
     setupWalletCopyButton();
     applyCachedStats();
+
+    loadFinanceTimelineFromBackend().then((remoteTimeline) => {
+      if (!remoteTimeline) return;
+      setFinanceTimelineItems(mergeTimelineItems(DEFAULT_TIMELINE_ITEMS, localTimelineItems || [], remoteTimeline));
+      renderTrollDeaths();
+      if (latestChartPoints.length && latestChartMetrics) {
+        renderChartEventNodes(latestChartPoints, latestChartMetrics);
+        renderDeathRollup(Number(latestChartPoints[latestChartPoints.length - 1]?.[1] || 0));
+      }
+    });
 
     Promise.allSettled([loadTrollStats(), loadTransfers()]).then(() => {
       // If price resolved after transfers rendered, refresh USD estimations.
