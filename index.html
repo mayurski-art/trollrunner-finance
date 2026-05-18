@@ -1323,9 +1323,9 @@ h1 {
 
       <div class="death-summary" aria-label="Trolldeaths summary">
         <article class="death-stat">
-          <div class="death-stat-label">Recorded Doom Calls</div>
+          <div class="death-stat-label">Recorded Receipts</div>
           <div class="death-stat-value" id="doom-total">0</div>
-          <div class="death-stat-copy">A running count of logged FUD events and obituary posts.</div>
+          <div class="death-stat-copy">A running count of every archived finance timeline receipt across all modes.</div>
         </article>
         <article class="death-stat">
           <div class="death-stat-label">Latest Theme</div>
@@ -1375,7 +1375,8 @@ h1 {
             </div>
           </div>
           <div class="timeline-mode-bar" aria-label="Timeline mode">
-            <button id="timeline-mode-fud" class="timeline-mode-btn is-active" type="button">FUD Mode</button>
+            <button id="timeline-mode-all" class="timeline-mode-btn is-active" type="button">All Receipts</button>
+            <button id="timeline-mode-fud" class="timeline-mode-btn" type="button">FUD Mode</button>
             <button id="timeline-mode-guardian" class="timeline-mode-btn" type="button">Guardian Mode</button>
           </div>
           <div id="timeline-list" class="timeline-list"></div>
@@ -1394,7 +1395,6 @@ h1 {
       </div>
     </section>
   </div>
-  <script src="finance-timeline-data.js"></script>
   <script>
     const TROLL_WALLET = "79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA";
     const TROLL_MINT = "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2";
@@ -1704,6 +1704,7 @@ h1 {
     const SUPABASE_ANON_KEY_PLACEHOLDER = "your_anon_public_key";
     const SUPABASE_TABLE = "site_updates";
     const SUPABASE_ROW_ID = "finance_timeline";
+    const SHARED_TIMELINE_JSON_URL = "assets/data/finance-timeline.json";
     const TIMELINE_POLL_MS = 10000;
     const LOCAL_TIMELINE_KEY = "trollrunner_finance_timeline_cache";
     const ADMIN_PASSWORD_TROLL_MESSAGES = [
@@ -1712,14 +1713,9 @@ h1 {
       "Admin access denied. Come back with the real troll credentials.",
       "Still wrong. The tweet vault remains sealed."
     ];
-    const DEFAULT_TIMELINE_ITEMS = cloneNormalizedTimeline(window.FINANCE_TIMELINE_SEED || []).length
-      ? cloneNormalizedTimeline(window.FINANCE_TIMELINE_SEED || [])
-      : [
-          ...TROLL_FUD_TIMELINE.map((item) => ({ ...item })),
-          ...TROLL_GUARDIAN_TIMELINE.map((item) => ({ ...item })),
-        ];
+    const DEFAULT_TIMELINE_ITEMS = [];
     let financeTimelineItems = DEFAULT_TIMELINE_ITEMS.map((item) => ({ ...item, tags: Array.isArray(item.tags) ? [...item.tags] : [] }));
-    let activeTimelineMode = "fud";
+    let activeTimelineMode = "all";
     let activeChartRange = DEFAULT_CHART_RANGE;
     let cachedChartSeries = new Map();
     let latestChartPoints = [];
@@ -1862,6 +1858,19 @@ h1 {
         return normalized.length ? normalized : null;
       } catch (error) {
         console.error("Unable to load finance timeline from Supabase", error);
+        return null;
+      }
+    }
+
+    async function loadFinanceTimelineFromJson() {
+      try {
+        const response = await fetch(SHARED_TIMELINE_JSON_URL, { cache: "no-store" });
+        if (!response.ok) return null;
+        const payload = await response.json();
+        const normalized = cloneNormalizedTimeline(payload);
+        return normalized.length ? normalized : null;
+      } catch (error) {
+        console.error("Unable to load finance timeline JSON", error);
         return null;
       }
     }
@@ -2284,6 +2293,7 @@ h1 {
     }
 
     function getActiveTimelineItems() {
+      if (activeTimelineMode === "all") return sortTimelineItems(financeTimelineItems);
       const targetKind = activeTimelineMode === "guardian" ? "guardian" : "fud";
       return sortTimelineItems(financeTimelineItems.filter((item) => item.kind === targetKind));
     }
@@ -2419,18 +2429,22 @@ h1 {
 
     function setTimelineMode(nextMode) {
       activeTimelineMode = nextMode;
+      document.getElementById("timeline-mode-all")?.classList.toggle("is-active", nextMode === "all");
       document.getElementById("timeline-mode-fud")?.classList.toggle("is-active", nextMode === "fud");
       document.getElementById("timeline-mode-guardian")?.classList.toggle("is-active", nextMode === "guardian");
       const copyEl = document.getElementById("timeline-mode-copy");
       if (copyEl) {
         copyEl.textContent = nextMode === "guardian"
           ? "Guardian Mode tracks the higher-signal defenses, community pushback, and pro-TROLL counterposts I could verify."
-          : "Each row is a moment where the anti-TROLL thesis got loud enough to archive.";
+          : nextMode === "fud"
+            ? "Each row is a moment where the anti-TROLL thesis got loud enough to archive."
+            : "All Receipts combines FUD and Guardian posts so every archived tweet shows up in one shared feed.";
       }
       renderTrollDeaths();
     }
 
     function setupTimelineModeButtons() {
+      document.getElementById("timeline-mode-all")?.addEventListener("click", () => setTimelineMode("all"));
       document.getElementById("timeline-mode-fud")?.addEventListener("click", () => setTimelineMode("fud"));
       document.getElementById("timeline-mode-guardian")?.addEventListener("click", () => setTimelineMode("guardian"));
     }
@@ -2438,13 +2452,13 @@ h1 {
     function renderTrollDeaths() {
       const activeItems = getActiveTimelineItems();
       const fudItems = sortTimelineItems(financeTimelineItems.filter((item) => item.kind === "fud"));
-      const latestTheme = fudItems[0]?.title || "Monitoring";
+      const latestTheme = activeItems[0]?.title || sortTimelineItems(financeTimelineItems)[0]?.title || "Monitoring";
       const totalEl = document.getElementById("doom-total");
       const latestEl = document.getElementById("doom-latest");
       const chartNotesEl = document.getElementById("chart-notes");
       const timelineEl = document.getElementById("timeline-list");
 
-      if (totalEl) totalEl.textContent = fudItems.length.toString();
+      if (totalEl) totalEl.textContent = financeTimelineItems.length.toString();
       if (latestEl) latestEl.textContent = latestTheme;
 
       if (chartNotesEl) {
@@ -2558,7 +2572,7 @@ h1 {
     });
 
     const localTimelineItems = getStoredTimelineItems();
-    setFinanceTimelineItems(mergeTimelineItems(DEFAULT_TIMELINE_ITEMS, localTimelineItems || []), { persist: false });
+    setFinanceTimelineItems(localTimelineItems || [], { persist: false });
 
     renderTrollDeaths();
     setupChartRangeButtons();
@@ -2567,9 +2581,15 @@ h1 {
     setupWalletCopyButton();
     applyCachedStats();
 
-    loadFinanceTimelineFromBackend().then((remoteTimeline) => {
-      if (!remoteTimeline) return;
-      setFinanceTimelineItems(mergeTimelineItems(DEFAULT_TIMELINE_ITEMS, localTimelineItems || [], remoteTimeline));
+    Promise.allSettled([
+      loadFinanceTimelineFromJson(),
+      loadFinanceTimelineFromBackend(),
+    ]).then(([jsonResult, remoteResult]) => {
+      const jsonTimeline = jsonResult.status === "fulfilled" ? jsonResult.value : null;
+      const remoteTimeline = remoteResult.status === "fulfilled" ? remoteResult.value : null;
+      const mergedTimeline = mergeTimelineItems(jsonTimeline || [], localTimelineItems || [], remoteTimeline || []);
+      if (!mergedTimeline.length) return;
+      setFinanceTimelineItems(mergedTimeline);
       renderTrollDeaths();
       if (latestChartPoints.length && latestChartMetrics) {
         renderChartEventNodes(latestChartPoints, latestChartMetrics);

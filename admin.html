@@ -315,7 +315,6 @@ textarea:focus {
     </section>
   </div>
 
-  <script src="finance-timeline-data.js"></script>
   <script>
     const AUTH_KEY = "trollrunner_finance_admin_auth";
     const LOCAL_TIMELINE_KEY = "trollrunner_finance_timeline_cache";
@@ -324,6 +323,7 @@ textarea:focus {
     const SUPABASE_ANON_KEY_PLACEHOLDER = "your_anon_public_key";
     const SUPABASE_TABLE = "site_updates";
     const SUPABASE_ROW_ID = "finance_timeline";
+    const SHARED_TIMELINE_JSON_URL = "assets/data/finance-timeline.json";
     let editingEntryId = null;
     let timelineItems = [];
 
@@ -618,16 +618,29 @@ textarea:focus {
       }
     }
 
+    async function loadTimelineFromJson() {
+      try {
+        const response = await fetch(SHARED_TIMELINE_JSON_URL, { cache: "no-store" });
+        if (!response.ok) return null;
+        const payload = await response.json();
+        return cloneTimelineItems(payload);
+      } catch (error) {
+        console.error("Unable to load finance timeline JSON", error);
+        return null;
+      }
+    }
+
     async function saveTimelineToBackend(items) {
       if (!isSupabaseConfigured()) return false;
       try {
-        const payload = {
+        const payload = [{
           id: SUPABASE_ROW_ID,
           updates: items,
-        };
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?on_conflict=id`, {
+          updated_at: new Date().toISOString(),
+        }];
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`, {
           method: "POST",
-          headers: supabaseHeaders("resolution=merge-duplicates,return=representation"),
+          headers: supabaseHeaders("resolution=merge-duplicates,return=minimal"),
           body: JSON.stringify(payload),
         });
         return response.ok;
@@ -716,43 +729,38 @@ textarea:focus {
     }
 
     async function boot() {
-      const seeded = cloneTimelineItems(window.FINANCE_TIMELINE_SEED || []);
-      timelineItems = seeded;
+      timelineItems = [];
+      let jsonItems = null;
       let localItems = null;
       try {
         localItems = JSON.parse(localStorage.getItem(LOCAL_TIMELINE_KEY) || "null");
         if (Array.isArray(localItems) && localItems.length) {
-          timelineItems = mergeTimelineItems(seeded, localItems);
+          timelineItems = mergeTimelineItems(localItems);
         }
       } catch {}
+      jsonItems = await loadTimelineFromJson();
       const remoteItems = await loadTimelineFromBackend();
       if (Array.isArray(remoteItems) && remoteItems.length) {
-        timelineItems = mergeTimelineItems(seeded, remoteItems, Array.isArray(localItems) ? localItems : []);
+        timelineItems = mergeTimelineItems(
+          Array.isArray(jsonItems) ? jsonItems : [],
+          remoteItems,
+          Array.isArray(localItems) ? localItems : []
+        );
         localStorage.setItem(LOCAL_TIMELINE_KEY, JSON.stringify(timelineItems));
         setStatus("Loaded shared finance timeline from Supabase.");
-        if (getTimelineSignature(timelineItems) !== getTimelineSignature(remoteItems)) {
-          const saved = await saveTimelineToBackend(timelineItems);
-          if (saved) {
-            setStatus("Loaded shared finance timeline from Supabase and promoted local-only receipts to the shared timeline.");
-          } else {
-            setStatus("Loaded shared finance timeline, but local-only receipts could not be promoted to shared sync yet.", true);
-          }
-        }
       } else if (!isSupabaseConfigured()) {
         setStatus("Shared sync is disabled. Replace the Supabase anon key placeholder to enable cross-device updates.", true);
       } else {
-        timelineItems = mergeTimelineItems(seeded, Array.isArray(localItems) ? localItems : []);
-        if (timelineItems.length) {
-          const saved = await saveTimelineToBackend(timelineItems);
-          if (saved) {
-            localStorage.setItem(LOCAL_TIMELINE_KEY, JSON.stringify(timelineItems));
-            setStatus("Published the local finance timeline to shared sync for all devices.");
-          } else {
-            setStatus("Using local finance timeline cache until the first shared save.", true);
-          }
-        } else {
-          setStatus("Using local finance timeline cache until the first shared save.");
-        }
+        timelineItems = mergeTimelineItems(
+          Array.isArray(jsonItems) ? jsonItems : [],
+          Array.isArray(localItems) ? localItems : []
+        );
+        setStatus(
+          timelineItems.length
+            ? "Loaded the repo timeline baseline. Shared Supabase sync is still unavailable until the key/table access is fixed."
+            : "Timeline baseline unavailable and shared sync is not responding.",
+          true
+        );
       }
       renderEntries();
       resetForm();
