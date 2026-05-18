@@ -170,6 +170,13 @@ textarea:focus {
   color: var(--muted);
   font-size: 12px;
 }
+.entry-metrics {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
 .tag-row {
   display: flex;
   flex-wrap: wrap;
@@ -421,6 +428,21 @@ textarea:focus {
 
     function sortTimelineItems(items) {
       return [...items].sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
+    }
+
+    function formatMetricCount(value) {
+      const numeric = Number(value || 0);
+      return numeric ? numeric.toLocaleString() : "0";
+    }
+
+    function renderTweetMetrics(item) {
+      const metrics = item?.metrics || {};
+      return [
+        ["views", metrics.views],
+        ["likes", metrics.likes],
+        ["replies", metrics.replies],
+        ["reposts", metrics.reposts],
+      ].map(([label, value]) => `${formatMetricCount(value)} ${label}`).join(" | ");
     }
 
     function deriveTags(copy, kind) {
@@ -822,6 +844,7 @@ textarea:focus {
         <div class="tag-row">${entry.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>
         <h3>${escapeHtml(entry.title)}</h3>
         <p>${escapeHtml(entry.copy)}</p>
+        <div class="entry-metrics">${renderTweetMetrics(entry)}</div>
       `;
     }
 
@@ -842,6 +865,7 @@ textarea:focus {
           <h3>${escapeHtml(item.title)}</h3>
           <div class="tag-row">${item.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>
           <p>${escapeHtml(item.copy)}</p>
+          <div class="entry-metrics">${renderTweetMetrics(item)}</div>
           <div class="entry-actions">
             <button type="button" data-action="edit" data-id="${escapeHtml(item.id)}">Edit</button>
             <button type="button" class="button-danger" data-action="delete" data-id="${escapeHtml(item.id)}">Delete</button>

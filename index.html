@@ -806,6 +806,31 @@ h1 {
   gap: 12px;
 }
 
+.timeline-tools-toggle {
+  width: 100%;
+  margin-bottom: 12px;
+  border: 1px solid rgba(126, 255, 142, 0.2);
+  background: rgba(126, 255, 142, 0.08);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.timeline-tools-toggle:hover,
+.timeline-tools-toggle.is-open {
+  border-color: rgba(126, 255, 142, 0.36);
+  background: rgba(126, 255, 142, 0.16);
+}
+
+.timeline-tools[hidden] {
+  display: none !important;
+}
+
 .timeline-mode-bar {
   display: flex;
   gap: 8px;
@@ -1488,14 +1513,19 @@ h1 {
               <p id="timeline-mode-copy">Each row is a moment where the anti-TROLL thesis got loud enough to archive.</p>
             </div>
           </div>
-          <div class="timeline-mode-bar" aria-label="Timeline mode">
-            <button id="timeline-mode-all" class="timeline-mode-btn is-active" type="button">All Receipts</button>
-            <button id="timeline-mode-fud" class="timeline-mode-btn" type="button">FUD Mode</button>
-            <button id="timeline-mode-guardian" class="timeline-mode-btn" type="button">Guardian Mode</button>
+          <button id="timeline-tools-toggle" class="timeline-tools-toggle" type="button" aria-expanded="false" aria-controls="timeline-tools">
+            Open Timeline Controls
+          </button>
+          <div id="timeline-tools" class="timeline-tools" hidden>
+            <div class="timeline-mode-bar" aria-label="Timeline mode">
+              <button id="timeline-mode-all" class="timeline-mode-btn is-active" type="button">All Receipts</button>
+              <button id="timeline-mode-fud" class="timeline-mode-btn" type="button">FUD Mode</button>
+              <button id="timeline-mode-guardian" class="timeline-mode-btn" type="button">Guardian Mode</button>
+            </div>
+            <div id="timeline-sort-bar" class="timeline-sort-bar" aria-label="Timeline sort order"></div>
+            <div id="timeline-filter-bar" class="timeline-filter-bar" aria-label="Timeline tags"></div>
+            <div id="timeline-month-bar" class="timeline-month-bar" aria-label="Timeline dates"></div>
           </div>
-          <div id="timeline-sort-bar" class="timeline-sort-bar" aria-label="Timeline sort order"></div>
-          <div id="timeline-filter-bar" class="timeline-filter-bar" aria-label="Timeline tags"></div>
-          <div id="timeline-month-bar" class="timeline-month-bar" aria-label="Timeline months"></div>
           <div id="timeline-list" class="timeline-list"></div>
         </section>
       </div>
@@ -1836,6 +1866,7 @@ h1 {
     let activeTimelineTag = "all";
     let activeTimelineMonth = "all";
     let activeTimelineSort = "newest";
+    let timelineToolsOpen = false;
     let activeChartRange = DEFAULT_CHART_RANGE;
     let cachedChartSeries = new Map();
     let latestChartPoints = [];
@@ -1948,6 +1979,19 @@ h1 {
       return parsed.toLocaleString(undefined, { month: "short", year: "numeric" });
     }
 
+    function getItemDateKey(item) {
+      const date = new Date(item?.eventDate || Date.now());
+      if (Number.isNaN(date.getTime())) return "unknown";
+      return date.toISOString().slice(0, 10);
+    }
+
+    function formatDateKey(dateKey) {
+      if (dateKey === "all") return "All Dates";
+      const parsed = new Date(`${dateKey}T00:00:00`);
+      if (Number.isNaN(parsed.getTime())) return "Unknown";
+      return formatTimelineDisplayDate(parsed);
+    }
+
     function getTimelineHandle(item) {
       const titleHandle = String(item?.title || "").match(/^([^:]{2,32}):/);
       if (titleHandle) return titleHandle[1].replace(/^@/, "").trim();
@@ -1964,6 +2008,71 @@ h1 {
       const modeWeight = item?.kind === "fud" ? 24 : 18;
       const engagement = (views / 120) + (likes * 3) + (replies * 7) + (reposts * 5);
       return Math.round(modeWeight + engagement);
+    }
+
+    function formatMetricCount(value) {
+      const numeric = Number(value || 0);
+      return numeric ? numeric.toLocaleString() : "0";
+    }
+
+    function renderTweetMetrics(item) {
+      const metrics = item?.metrics || {};
+      return [
+        ["views", metrics.views],
+        ["likes", metrics.likes],
+        ["replies", metrics.replies],
+        ["reposts", metrics.reposts],
+      ].map(([label, value]) => `${formatMetricCount(value)} ${label}`).join(" | ");
+    }
+
+    function extractTweetId(sourceHref) {
+      const match = String(sourceHref || "").match(/status\/(\d+)/i);
+      return match ? match[1] : "";
+    }
+
+    async function fetchTweetMetrics(sourceHref) {
+      const tweetId = extractTweetId(sourceHref);
+      if (!tweetId) return null;
+      try {
+        const endpoint = `https://cdn.syndication.twimg.com/tweet-result?id=${encodeURIComponent(tweetId)}&lang=en`;
+        const response = await fetch(endpoint, { cache: "no-store" });
+        if (!response.ok) return null;
+        const payload = await response.json();
+        return {
+          views: Number(payload?.views?.count || payload?.view_count || 0) || 0,
+          likes: Number(payload?.favorite_count || payload?.favoriteCount || 0) || 0,
+          replies: Number(payload?.conversation_count || payload?.reply_count || 0) || 0,
+          reposts: Number(payload?.retweet_count || 0) || 0,
+        };
+      } catch (error) {
+        console.error("Unable to refresh tweet metrics", error);
+        return null;
+      }
+    }
+
+    async function syncTweetMetricsForTimeline() {
+      const candidates = financeTimelineItems.filter((item) => extractTweetId(item.sourceHref));
+      if (!candidates.length) return;
+      const results = await Promise.allSettled(candidates.map((item) => fetchTweetMetrics(item.sourceHref)));
+      let changed = false;
+      const metricsById = new Map();
+      results.forEach((result, index) => {
+        if (result.status !== "fulfilled" || !result.value) return;
+        metricsById.set(candidates[index].id, result.value);
+      });
+      if (!metricsById.size) return;
+      const nextItems = financeTimelineItems.map((item) => {
+        const nextMetrics = metricsById.get(item.id);
+        if (!nextMetrics) return item;
+        const current = item.metrics || {};
+        const sameMetrics = ["views", "likes", "replies", "reposts"].every((key) => Number(current[key] || 0) === Number(nextMetrics[key] || 0));
+        if (sameMetrics) return item;
+        changed = true;
+        return { ...item, metrics: nextMetrics };
+      });
+      if (!changed) return;
+      setFinanceTimelineItems(nextItems);
+      renderTrollDeaths();
     }
 
     function sortByActiveTimelineSort(items) {
@@ -2481,7 +2590,7 @@ h1 {
         items = items.filter((item) => item.tags.includes(activeTimelineTag));
       }
       if (activeTimelineMonth !== "all") {
-        items = items.filter((item) => getItemMonthKey(item) === activeTimelineMonth);
+        items = items.filter((item) => getItemDateKey(item) === activeTimelineMonth);
       }
       return sortByActiveTimelineSort(items);
     }
@@ -2646,10 +2755,27 @@ h1 {
       renderTrollDeaths();
     }
 
+    function syncTimelineTools() {
+      const panel = document.getElementById("timeline-tools");
+      const toggle = document.getElementById("timeline-tools-toggle");
+      if (!panel || !toggle) return;
+      panel.hidden = !timelineToolsOpen;
+      toggle.classList.toggle("is-open", timelineToolsOpen);
+      toggle.setAttribute("aria-expanded", timelineToolsOpen ? "true" : "false");
+      toggle.textContent = timelineToolsOpen ? "Close Timeline Controls" : "Open Timeline Controls";
+    }
+
+    function toggleTimelineTools() {
+      timelineToolsOpen = !timelineToolsOpen;
+      syncTimelineTools();
+    }
+
     function setupTimelineModeButtons() {
+      document.getElementById("timeline-tools-toggle")?.addEventListener("click", toggleTimelineTools);
       document.getElementById("timeline-mode-all")?.addEventListener("click", () => setTimelineMode("all"));
       document.getElementById("timeline-mode-fud")?.addEventListener("click", () => setTimelineMode("fud"));
       document.getElementById("timeline-mode-guardian")?.addEventListener("click", () => setTimelineMode("guardian"));
+      syncTimelineTools();
     }
 
     function renderTimelineControls() {
@@ -2673,8 +2799,7 @@ h1 {
         const counts = new Map();
         financeTimelineItems.forEach((item) => item.tags.forEach((tag) => counts.set(tag, (counts.get(tag) || 0) + 1)));
         const topTags = [...counts.entries()]
-          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-          .slice(0, 12);
+          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
         if (activeTimelineTag !== "all" && !counts.has(activeTimelineTag)) activeTimelineTag = "all";
         tagEl.innerHTML = [
           `<button class="timeline-filter-btn ${activeTimelineTag === "all" ? "is-active" : ""}" type="button" data-tag="all">All Tags</button>`,
@@ -2685,11 +2810,11 @@ h1 {
         });
       }
       if (monthEl) {
-        const months = [...new Set(sortTimelineItems(financeTimelineItems).map(getItemMonthKey))];
-        if (activeTimelineMonth !== "all" && !months.includes(activeTimelineMonth)) activeTimelineMonth = "all";
+        const dates = [...new Set(sortTimelineItems(financeTimelineItems).map(getItemDateKey))];
+        if (activeTimelineMonth !== "all" && !dates.includes(activeTimelineMonth)) activeTimelineMonth = "all";
         monthEl.innerHTML = [
-          `<button class="timeline-month-btn ${activeTimelineMonth === "all" ? "is-active" : ""}" type="button" data-month="all">All Months</button>`,
-          ...months.map((month) => `<button class="timeline-month-btn ${activeTimelineMonth === month ? "is-active" : ""}" type="button" data-month="${escapeHtml(month)}">${escapeHtml(formatMonthKey(month))}</button>`)
+          `<button class="timeline-month-btn ${activeTimelineMonth === "all" ? "is-active" : ""}" type="button" data-month="all">All Dates</button>`,
+          ...dates.map((date) => `<button class="timeline-month-btn ${activeTimelineMonth === date ? "is-active" : ""}" type="button" data-month="${escapeHtml(date)}">${escapeHtml(formatDateKey(date))}</button>`)
         ].join("");
         monthEl.querySelectorAll("[data-month]").forEach((button) => {
           button.addEventListener("click", () => setTimelineMonth(button.dataset.month));
@@ -2738,7 +2863,7 @@ h1 {
           <div class="leaderboard-name">@${escapeHtml(leader.handle)}</div>
           <div class="leaderboard-score">${leader.score.toLocaleString()} pts</div>
           <div class="leaderboard-meta">${leader.receipts} receipts | ${leader.fud} FUD | ${leader.guardian} Guardian</div>
-          <div class="leaderboard-meta">${leader.views.toLocaleString()} views | ${leader.likes.toLocaleString()} likes | ${leader.replies.toLocaleString()} replies</div>
+          <div class="leaderboard-meta">${leader.views.toLocaleString()} views | ${leader.likes.toLocaleString()} likes | ${leader.replies.toLocaleString()} replies | ${leader.reposts.toLocaleString()} reposts</div>
         </article>
       `).join("");
     }
@@ -2776,7 +2901,7 @@ h1 {
               <div class="timeline-tags">${item.tags.map((tag) => `<span class="timeline-tag">${escapeHtml(tag)}</span>`).join("")}</div>
               <h4>${escapeHtml(item.title)}</h4>
               <p>${escapeHtml(item.copy)}</p>
-              <div class="timeline-score">Receipt score: ${getItemScore(item).toLocaleString()}${item.metrics?.views ? ` | ${Number(item.metrics.views).toLocaleString()} views` : ""}${item.metrics?.likes ? ` | ${Number(item.metrics.likes).toLocaleString()} likes` : ""}</div>
+              <div class="timeline-score">Receipt score: ${getItemScore(item).toLocaleString()} | ${renderTweetMetrics(item)}</div>
               <a class="timeline-source" href="${escapeHtml(item.sourceHref)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.sourceLabel)}</a>
             </div>
           </article>
@@ -2894,6 +3019,7 @@ h1 {
         renderChartEventNodes(latestChartPoints, latestChartMetrics);
         renderDeathRollup(Number(latestChartPoints[latestChartPoints.length - 1]?.[1] || 0));
       }
+      syncTweetMetricsForTimeline();
     });
 
     Promise.allSettled([loadTrollStats(), loadTransfers()]).then(() => {
