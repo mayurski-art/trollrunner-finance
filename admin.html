@@ -323,7 +323,6 @@ textarea:focus {
     const SUPABASE_ANON_KEY_PLACEHOLDER = "your_anon_public_key";
     const SUPABASE_TABLE = "site_updates";
     const SUPABASE_ROW_ID = "finance_timeline";
-    const AI_SUMMARY_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/summarize-finance-tweet`;
     const SHARED_TIMELINE_JSON_URL = "assets/data/finance-timeline.json";
     let editingEntryId = null;
     let timelineItems = [];
@@ -421,14 +420,16 @@ textarea:focus {
       const text = String(copy || "").toLowerCase();
       const orderedTags = [];
       const tagMap = [
+        ["funding", ["dumping millions", "dump millions", "funding", "fund "]],
+        ["airdrop", ["airdrop"]],
         ["zero", ["going to zero", "zero"]],
         ["conviction", ["conviction", "believe", "belief"]],
         ["community", ["community", "holders", "holder"]],
+        ["main-character", ["main character"]],
+        ["trend", ["trend", "trending", "revived"]],
         ["chart", ["chart", "candles", "price"]],
         ["billions", ["billion", "billions"]],
         ["bagwork", ["bagwork", "run", "miles"]],
-        ["airdrop", ["airdrop"]],
-        ["funding", ["fund", "funding", "dumping millions", "dump millions"]],
         ["execution", ["execution", "team", "roadmap"]],
       ];
       for (const [tag, needles] of tagMap) {
@@ -473,6 +474,18 @@ textarea:focus {
     function extractTweetId(sourceHref) {
       const match = String(sourceHref || "").match(/\/status\/(\d+)/i);
       return match ? match[1] : "";
+    }
+
+    function dateFromTweetId(tweetId) {
+      if (!tweetId || typeof BigInt !== "function") return "";
+      try {
+        const twitterEpochMs = 1288834974657n;
+        const timestampMs = Number((BigInt(tweetId) >> 22n) + twitterEpochMs);
+        const parsed = new Date(timestampMs);
+        return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
+      } catch {
+        return "";
+      }
     }
 
     function extractHandle(text, sourceHref) {
@@ -632,51 +645,21 @@ textarea:focus {
       return pasted.length >= fetched.length ? pasted : fetched;
     }
 
-    function normalizeAiSummary(summary) {
-      if (!summary || typeof summary !== "object") return null;
-      const title = String(summary.title || "").replace(/\s+/g, " ").trim();
-      const copy = String(summary.copy || summary.body || "").replace(/\s+/g, " ").trim();
-      const tags = Array.isArray(summary.tags)
-        ? summary.tags.map((tag) => String(tag || "").trim().toLowerCase().replace(/\s+/g, "-")).filter(Boolean).slice(0, 4)
-        : [];
-      if (!title || !copy) return null;
-      return { title, copy, tags };
-    }
-
-    async function summarizeTweetWithAi({ kind, handle, copy, eventDate, sourceHref }) {
-      if (!isSupabaseConfigured() || !copy) return null;
-      try {
-        const response = await fetch(AI_SUMMARY_FUNCTION_URL, {
-          method: "POST",
-          headers: supabaseHeaders("return=minimal"),
-          body: JSON.stringify({ kind, handle, copy, eventDate, sourceHref }),
-        });
-        if (!response.ok) {
-          console.warn("AI summary unavailable", await response.text());
-          return null;
-        }
-        return normalizeAiSummary(await response.json());
-      } catch (error) {
-        console.error("Unable to summarize tweet with AI", error);
-        return null;
-      }
-    }
-
     async function parseTweetPaste(rawText, kind) {
       const sourceHref = extractFirstUrl(rawText);
+      const tweetDate = dateFromTweetId(extractTweetId(sourceHref));
       const pasted = buildTweetCopyFromPaste(rawText, sourceHref);
       const fetched = sourceHref ? await fetchTweetDetails(sourceHref) : null;
       const handle = fetched?.handle || pasted.handle || extractHandle(rawText, sourceHref);
       const copy = pickBestTweetCopy(pasted.copy, fetched?.text) || String(rawText || "").trim();
-      const eventDate = fetched?.eventDate || extractDate(rawText) || new Date().toISOString();
+      const eventDate = fetched?.eventDate || extractDate(rawText) || tweetDate || new Date().toISOString();
       const resolvedSourceHref = fetched?.sourceHref || sourceHref;
-      const aiSummary = await summarizeTweetWithAi({ kind, handle, copy, eventDate, sourceHref: resolvedSourceHref });
       return {
         kind,
         eventDate,
-        title: aiSummary?.title || summarizeTitle(copy, handle, kind),
-        copy: aiSummary?.copy || copy,
-        tags: aiSummary?.tags?.length ? aiSummary.tags : deriveTags(copy, kind),
+        title: summarizeTitle(copy, handle, kind),
+        copy,
+        tags: deriveTags(copy, kind),
         sourceLabel: resolvedSourceHref && (resolvedSourceHref.includes("x.com") || resolvedSourceHref.includes("twitter.com")) ? "Open on X" : "Open source",
         sourceHref: resolvedSourceHref,
       };
