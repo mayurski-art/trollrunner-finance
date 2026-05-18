@@ -323,6 +323,7 @@ textarea:focus {
     const SUPABASE_ANON_KEY_PLACEHOLDER = "your_anon_public_key";
     const SUPABASE_TABLE = "site_updates";
     const SUPABASE_ROW_ID = "finance_timeline";
+    const AI_SUMMARY_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/summarize-finance-tweet`;
     const SHARED_TIMELINE_JSON_URL = "assets/data/finance-timeline.json";
     let editingEntryId = null;
     let timelineItems = [];
@@ -592,6 +593,32 @@ textarea:focus {
         };
       } catch (error) {
         console.error("Unable to fetch tweet details", error);
+      }
+      try {
+        const oembedUrl = `https://publish.x.com/oembed?omit_script=1&lang=en&url=${encodeURIComponent(canonicalizeTweetUrl(sourceHref))}`;
+        const response = await fetch(oembedUrl, { cache: "no-store" });
+        if (!response.ok) return null;
+        const payload = await response.json();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(String(payload?.html || ""), "text/html");
+        const blockquote = doc.querySelector("blockquote.twitter-tweet");
+        const paragraph = blockquote?.querySelector("p");
+        const links = Array.from(blockquote?.querySelectorAll("a") || []);
+        const dateLink = links.length ? links[links.length - 1] : null;
+        const rawText = paragraph ? paragraph.textContent || "" : "";
+        const text = normalizeTweetCopy(rawText);
+        const dateText = String(dateLink?.textContent || "").trim();
+        const parsedDate = dateText ? new Date(dateText) : null;
+        const eventDate = parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate.toISOString() : "";
+        const authorName = String(payload?.author_name || "").trim();
+        return {
+          handle: extractHandle(authorName, sourceHref) || extractHandle("", sourceHref),
+          text,
+          eventDate,
+          sourceHref: canonicalizeTweetUrl(String(payload?.url || sourceHref)),
+        };
+      } catch (error) {
+        console.error("Unable to fetch tweet oEmbed details", error);
         return null;
       }
     }
@@ -605,6 +632,36 @@ textarea:focus {
       return pasted.length >= fetched.length ? pasted : fetched;
     }
 
+    function normalizeAiSummary(summary) {
+      if (!summary || typeof summary !== "object") return null;
+      const title = String(summary.title || "").replace(/\s+/g, " ").trim();
+      const copy = String(summary.copy || summary.body || "").replace(/\s+/g, " ").trim();
+      const tags = Array.isArray(summary.tags)
+        ? summary.tags.map((tag) => String(tag || "").trim().toLowerCase().replace(/\s+/g, "-")).filter(Boolean).slice(0, 4)
+        : [];
+      if (!title || !copy) return null;
+      return { title, copy, tags };
+    }
+
+    async function summarizeTweetWithAi({ kind, handle, copy, eventDate, sourceHref }) {
+      if (!isSupabaseConfigured() || !copy) return null;
+      try {
+        const response = await fetch(AI_SUMMARY_FUNCTION_URL, {
+          method: "POST",
+          headers: supabaseHeaders("return=minimal"),
+          body: JSON.stringify({ kind, handle, copy, eventDate, sourceHref }),
+        });
+        if (!response.ok) {
+          console.warn("AI summary unavailable", await response.text());
+          return null;
+        }
+        return normalizeAiSummary(await response.json());
+      } catch (error) {
+        console.error("Unable to summarize tweet with AI", error);
+        return null;
+      }
+    }
+
     async function parseTweetPaste(rawText, kind) {
       const sourceHref = extractFirstUrl(rawText);
       const pasted = buildTweetCopyFromPaste(rawText, sourceHref);
@@ -613,12 +670,13 @@ textarea:focus {
       const copy = pickBestTweetCopy(pasted.copy, fetched?.text) || String(rawText || "").trim();
       const eventDate = fetched?.eventDate || extractDate(rawText) || new Date().toISOString();
       const resolvedSourceHref = fetched?.sourceHref || sourceHref;
+      const aiSummary = await summarizeTweetWithAi({ kind, handle, copy, eventDate, sourceHref: resolvedSourceHref });
       return {
         kind,
         eventDate,
-        title: summarizeTitle(copy, handle, kind),
-        copy,
-        tags: deriveTags(copy, kind),
+        title: aiSummary?.title || summarizeTitle(copy, handle, kind),
+        copy: aiSummary?.copy || copy,
+        tags: aiSummary?.tags?.length ? aiSummary.tags : deriveTags(copy, kind),
         sourceLabel: resolvedSourceHref && (resolvedSourceHref.includes("x.com") || resolvedSourceHref.includes("twitter.com")) ? "Open on X" : "Open source",
         sourceHref: resolvedSourceHref,
       };
