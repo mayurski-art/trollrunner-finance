@@ -838,16 +838,18 @@ textarea:focus {
 
     async function parsePasteIntoForm() {
       const rawText = document.getElementById("raw-paste").value.trim();
+      const sourceInput = document.getElementById("entry-source-href").value.trim();
       const kind = document.getElementById("entry-kind").value;
       const parseButton = document.getElementById("parse-btn");
-      if (!rawText) {
-        setStatus("Paste tweet text or a receipt block first.", true);
+      const parseInput = rawText || sourceInput;
+      if (!parseInput) {
+        setStatus("Paste tweet text into the big box or drop an X link into Source Link first.", true);
         return;
       }
       parseButton.disabled = true;
       setStatus("Parsing tweet and checking the X link for extra details...");
       try {
-        const parsed = await parseTweetPaste(rawText, kind);
+        const parsed = await parseTweetPaste(parseInput, kind);
         document.getElementById("entry-date").value = toDatetimeLocalValue(parsed.eventDate);
         document.getElementById("entry-title").value = parsed.title;
         document.getElementById("entry-copy").value = parsed.copy;
