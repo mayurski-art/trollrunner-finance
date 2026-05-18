@@ -426,7 +426,8 @@ textarea:focus {
         ["chart", ["chart", "candles", "price"]],
         ["billions", ["billion", "billions"]],
         ["bagwork", ["bagwork", "run", "miles"]],
-        ["funding", ["airdrop", "fund", "funding"]],
+        ["airdrop", ["airdrop"]],
+        ["funding", ["fund", "funding", "dumping millions", "dump millions"]],
         ["execution", ["execution", "team", "roadmap"]],
       ];
       for (const [tag, needles] of tagMap) {
@@ -444,14 +445,40 @@ textarea:focus {
       return `${handle || (kind === "guardian" ? "Guardian receipt" : "FUD receipt")}: ${short}`;
     }
 
+    function stripTrailingTweetUrlPunctuation(value) {
+      return String(value || "").replace(/[)\]>,.!?]+$/, "");
+    }
+
+    function canonicalizeTweetUrl(url) {
+      const raw = stripTrailingTweetUrlPunctuation(url);
+      if (!raw) return "";
+      try {
+        const parsed = new URL(raw);
+        parsed.hash = "";
+        const host = parsed.hostname.replace(/^www\./i, "").toLowerCase();
+        if (host === "mobile.x.com") parsed.hostname = "x.com";
+        if (host === "mobile.twitter.com") parsed.hostname = "twitter.com";
+        return parsed.toString();
+      } catch {
+        return raw;
+      }
+    }
+
     function extractFirstUrl(text) {
       const match = String(text || "").match(/https?:\/\/\S+/i);
-      return match ? match[0].replace(/[)\].,]+$/, "") : "";
+      return match ? canonicalizeTweetUrl(match[0]) : "";
+    }
+
+    function extractTweetId(sourceHref) {
+      const match = String(sourceHref || "").match(/\/status\/(\d+)/i);
+      return match ? match[1] : "";
     }
 
     function extractHandle(text, sourceHref) {
       const urlMatch = String(sourceHref || "").match(/(?:x|twitter)\.com\/([A-Za-z0-9_]+)/i);
       if (urlMatch) return urlMatch[1];
+      const prefixedTextMatch = String(text || "").match(/^@?([A-Za-z0-9_]{2,20})\s*:/);
+      if (prefixedTextMatch) return prefixedTextMatch[1];
       const textMatch = String(text || "").match(/@([A-Za-z0-9_]{2,20})/);
       return textMatch ? textMatch[1] : "";
     }
@@ -469,32 +496,131 @@ textarea:focus {
         const parsed = new Date(match[0].replace("·", " "));
         if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
       }
-      return new Date().toISOString();
+      return "";
     }
 
-    function parseTweetPaste(rawText, kind) {
-      const sourceHref = extractFirstUrl(rawText);
-      const handle = extractHandle(rawText, sourceHref);
+    function isLikelyMetadataLine(line) {
+      const trimmed = String(line || "").trim();
+      if (!trimmed) return true;
+      if (/^https?:\/\//i.test(trimmed)) return true;
+      if (/^\d{1,2}:\d{2}\s?(?:AM|PM)\b/i.test(trimmed)) return true;
+      if (/^[A-Za-z]{3,9}\.?\s+\d{1,2},\s+\d{4}\b/i.test(trimmed)) return true;
+      if (/^\d{1,2}\/\d{1,2}\/\d{4}\b/.test(trimmed)) return true;
+      return false;
+    }
+
+    function normalizeTweetCopy(text) {
+      return String(text || "")
+        .replace(/https?:\/\/t\.co\/\S+/gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function normalizeForComparison(text) {
+      return normalizeTweetCopy(text)
+        .toLowerCase()
+        .replace(/[^\w$@]+/g, " ")
+        .trim();
+    }
+
+    function areEquivalentTweetLines(a, b) {
+      const left = normalizeForComparison(a);
+      const right = normalizeForComparison(b);
+      if (!left || !right) return false;
+      return left === right || left.includes(right) || right.includes(left);
+    }
+
+    function collapseDuplicateSentences(text) {
+      const parts = String(text || "")
+        .split(/[.!?]+\s+/)
+        .map((part) => part.trim())
+        .filter(Boolean);
+      const deduped = [];
+      for (const part of parts) {
+        if (deduped.some((existing) => areEquivalentTweetLines(existing, part))) continue;
+        deduped.push(part);
+      }
+      return deduped.join(" ").trim();
+    }
+
+    function buildTweetCopyFromPaste(rawText, sourceHref) {
       const lines = String(rawText || "")
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean)
-        .filter((line) => !/^https?:\/\//i.test(line));
-      const cleanedText = lines
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .replace(/^\@\w+\s+/, "")
-        .trim();
-      const copy = cleanedText || String(rawText || "").trim();
-      const eventDate = extractDate(rawText);
+        .filter((line) => !isLikelyMetadataLine(line));
+      if (!lines.length) return { handle: extractHandle(rawText, sourceHref), copy: "" };
+
+      let handle = extractHandle(rawText, sourceHref);
+      let bodyLines = [...lines];
+      const headerMatch = bodyLines[0].match(/^@?([A-Za-z0-9_]{2,20})\s*:\s+(.+)$/);
+      if (headerMatch) {
+        handle = handle || headerMatch[1];
+        const headlineText = headerMatch[2].trim();
+        if (bodyLines.length === 1) {
+          bodyLines[0] = headlineText;
+        } else if (areEquivalentTweetLines(headlineText, bodyLines.slice(1).join(" "))) {
+          bodyLines = bodyLines.slice(1);
+        } else {
+          bodyLines[0] = headlineText;
+        }
+      }
+
+      const copy = collapseDuplicateSentences(bodyLines.join(" "));
+      return { handle, copy };
+    }
+
+    async function fetchTweetDetails(sourceHref) {
+      const tweetId = extractTweetId(sourceHref);
+      if (!tweetId) return null;
+      try {
+        const endpoint = `https://cdn.syndication.twimg.com/tweet-result?id=${encodeURIComponent(tweetId)}&lang=en`;
+        const response = await fetch(endpoint, { cache: "no-store" });
+        if (!response.ok) return null;
+        const payload = await response.json();
+        const text = normalizeTweetCopy(payload?.text || "");
+        const eventDate = payload?.created_at ? new Date(payload.created_at).toISOString() : "";
+        const screenName = String(payload?.user?.screen_name || "").trim();
+        const canonicalSourceHref = screenName
+          ? `https://x.com/${screenName}/status/${tweetId}`
+          : canonicalizeTweetUrl(sourceHref);
+        return {
+          handle: screenName || extractHandle("", sourceHref),
+          text,
+          eventDate: Number.isNaN(new Date(eventDate).getTime()) ? "" : eventDate,
+          sourceHref: canonicalSourceHref,
+        };
+      } catch (error) {
+        console.error("Unable to fetch tweet details", error);
+        return null;
+      }
+    }
+
+    function pickBestTweetCopy(pastedCopy, fetchedCopy) {
+      const pasted = normalizeTweetCopy(pastedCopy);
+      const fetched = normalizeTweetCopy(fetchedCopy);
+      if (!pasted) return fetched;
+      if (!fetched) return pasted;
+      if (areEquivalentTweetLines(pasted, fetched)) return fetched.length >= pasted.length ? fetched : pasted;
+      return pasted.length >= fetched.length ? pasted : fetched;
+    }
+
+    async function parseTweetPaste(rawText, kind) {
+      const sourceHref = extractFirstUrl(rawText);
+      const pasted = buildTweetCopyFromPaste(rawText, sourceHref);
+      const fetched = sourceHref ? await fetchTweetDetails(sourceHref) : null;
+      const handle = fetched?.handle || pasted.handle || extractHandle(rawText, sourceHref);
+      const copy = pickBestTweetCopy(pasted.copy, fetched?.text) || String(rawText || "").trim();
+      const eventDate = fetched?.eventDate || extractDate(rawText) || new Date().toISOString();
+      const resolvedSourceHref = fetched?.sourceHref || sourceHref;
       return {
         kind,
         eventDate,
         title: summarizeTitle(copy, handle, kind),
         copy,
         tags: deriveTags(copy, kind),
-        sourceLabel: sourceHref && (sourceHref.includes("x.com") || sourceHref.includes("twitter.com")) ? "Open on X" : "Open source",
-        sourceHref,
+        sourceLabel: resolvedSourceHref && (resolvedSourceHref.includes("x.com") || resolvedSourceHref.includes("twitter.com")) ? "Open on X" : "Open source",
+        sourceHref: resolvedSourceHref,
       };
     }
 
@@ -710,22 +836,29 @@ textarea:focus {
       if (editingEntryId === id) resetForm();
     }
 
-    function parsePasteIntoForm() {
+    async function parsePasteIntoForm() {
       const rawText = document.getElementById("raw-paste").value.trim();
       const kind = document.getElementById("entry-kind").value;
+      const parseButton = document.getElementById("parse-btn");
       if (!rawText) {
         setStatus("Paste tweet text or a receipt block first.", true);
         return;
       }
-      const parsed = parseTweetPaste(rawText, kind);
-      document.getElementById("entry-date").value = toDatetimeLocalValue(parsed.eventDate);
-      document.getElementById("entry-title").value = parsed.title;
-      document.getElementById("entry-copy").value = parsed.copy;
-      document.getElementById("entry-tags").value = parsed.tags.join(", ");
-      document.getElementById("entry-source-label").value = parsed.sourceLabel;
-      document.getElementById("entry-source-href").value = parsed.sourceHref;
-      renderPreview();
-      setStatus("Paste parsed. Review the fields and save when ready.");
+      parseButton.disabled = true;
+      setStatus("Parsing tweet and checking the X link for extra details...");
+      try {
+        const parsed = await parseTweetPaste(rawText, kind);
+        document.getElementById("entry-date").value = toDatetimeLocalValue(parsed.eventDate);
+        document.getElementById("entry-title").value = parsed.title;
+        document.getElementById("entry-copy").value = parsed.copy;
+        document.getElementById("entry-tags").value = parsed.tags.join(", ");
+        document.getElementById("entry-source-label").value = parsed.sourceLabel;
+        document.getElementById("entry-source-href").value = parsed.sourceHref;
+        renderPreview();
+        setStatus("Paste parsed. Review the fields and save when ready.");
+      } finally {
+        parseButton.disabled = false;
+      }
     }
 
     async function boot() {
