@@ -326,6 +326,7 @@ textarea:focus {
     const SHARED_TIMELINE_JSON_URL = "assets/data/finance-timeline.json";
     let editingEntryId = null;
     let timelineItems = [];
+    let pendingEntryMetrics = { views: 0, likes: 0, replies: 0, reposts: 0 };
 
     if (localStorage.getItem(AUTH_KEY) !== "1") {
       window.location.href = "index.html";
@@ -380,6 +381,11 @@ textarea:focus {
       const tags = Array.isArray(item.tags)
         ? item.tags.map((tag) => String(tag || "").trim()).filter(Boolean).slice(0, 4)
         : [];
+      const metrics = item.metrics && typeof item.metrics === "object" ? item.metrics : {};
+      const views = Number(item.views ?? metrics.views ?? metrics.viewCount ?? 0) || 0;
+      const likes = Number(item.likes ?? metrics.likes ?? metrics.favoriteCount ?? 0) || 0;
+      const replies = Number(item.replies ?? item.comments ?? metrics.replies ?? metrics.replyCount ?? metrics.comments ?? 0) || 0;
+      const reposts = Number(item.reposts ?? item.retweets ?? metrics.reposts ?? metrics.retweets ?? metrics.retweetCount ?? 0) || 0;
       const sourceHref = String(item.sourceHref || "").trim();
       const sourceLabel = String(item.sourceLabel || (sourceHref.includes("x.com") || sourceHref.includes("twitter.com") ? "Open on X" : "Open source")).trim() || "Open source";
       return {
@@ -392,6 +398,7 @@ textarea:focus {
         copy,
         sourceLabel,
         sourceHref: sourceHref || "#",
+        metrics: { views, likes, replies, reposts },
       };
     }
 
@@ -420,31 +427,100 @@ textarea:focus {
       const text = String(copy || "").toLowerCase();
       const orderedTags = [];
       const tagMap = [
+        ["exit-liquidity", ["exit liquidity"]],
+        ["shitcoin-accusation", ["shitcoin", "shill"]],
+        ["drawdown-watch", ["down 92", "down 90", "drawdown", "down bad"]],
+        ["receipts", ["followers", "latest", "started", "since"]],
         ["funding", ["dumping millions", "dump millions", "funding", "fund "]],
         ["airdrop", ["airdrop"]],
-        ["zero", ["going to zero", "zero"]],
+        ["going-to-zero", ["going to zero", "zero"]],
         ["conviction", ["conviction", "believe", "belief"]],
         ["community", ["community", "holders", "holder"]],
         ["main-character", ["main character"]],
         ["trend", ["trend", "trending", "revived"]],
-        ["chart", ["chart", "candles", "price"]],
+        ["chart-crime", ["chart", "candles", "price"]],
         ["billions", ["billion", "billions"]],
         ["bagwork", ["bagwork", "run", "miles"]],
         ["execution", ["execution", "team", "roadmap"]],
+        ["creator-fees", ["creator fee", "buyback"]],
+        ["culture", ["meme", "lore", "culture"]],
+        ["pico-lows", ["pico", "lows", "low"]],
       ];
       for (const [tag, needles] of tagMap) {
         if (needles.some((needle) => text.includes(needle))) orderedTags.push(tag);
       }
       if (kind === "guardian" && !orderedTags.includes("community")) orderedTags.push("community");
-      if (kind === "fud" && !orderedTags.includes("zero")) orderedTags.push("zero");
-      return [...new Set(orderedTags)].slice(0, 3);
+      if (kind === "fud" && !orderedTags.includes("receipts")) orderedTags.push("receipts");
+      return [...new Set(orderedTags)].slice(0, 4);
+    }
+
+    function sentenceCase(value) {
+      const clean = String(value || "").trim();
+      return clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : "";
+    }
+
+    function compactTweetText(copy) {
+      return String(copy || "")
+        .replace(/pic\.twitter\.com\/\S+/gi, "")
+        .replace(/https?:\/\/\S+/gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function pickReceiptFrame(copy, kind) {
+      const text = compactTweetText(copy);
+      const lower = text.toLowerCase();
+      if (lower.includes("exit liquidity")) return "Exit-liquidity alarm";
+      if (lower.includes("shitcoin") || lower.includes("shill")) return "Shill-police indictment";
+      if (lower.includes("down 92") || lower.includes("down 90")) return "Drawdown receipt";
+      if (lower.includes("going to zero") || /\bzero\b/.test(lower)) return "Zero-call archive";
+      if (lower.includes("roadmap") || lower.includes("execution")) return "Execution audit";
+      if (lower.includes("airdrop")) return "Airdrop counterfactual";
+      if (lower.includes("community") && kind === "guardian") return "Community defense file";
+      if (lower.includes("bagwork") || lower.includes("miles") || lower.includes("run")) return "Bagwork proof";
+      if (lower.includes("billion")) return "Billion-thesis marker";
+      return kind === "guardian" ? "Guardian receipt" : "FUD receipt";
     }
 
     function summarizeTitle(copy, handle, kind) {
-      const clean = String(copy || "").replace(/\s+/g, " ").trim();
-      const snippet = clean.split(/[.!?]/)[0].trim() || clean;
-      const short = snippet.length > 68 ? `${snippet.slice(0, 65).trim()}...` : snippet;
-      return `${handle || (kind === "guardian" ? "Guardian receipt" : "FUD receipt")}: ${short}`;
+      const clean = compactTweetText(copy);
+      const frame = pickReceiptFrame(clean, kind);
+      const actor = handle ? `@${handle}` : (kind === "guardian" ? "Guardian" : "FUD desk");
+      const lower = clean.toLowerCase();
+      let angle = "";
+      const percent = clean.match(/\bdown\s+(\d{1,3})%/i);
+      if (percent) angle = `${percent[1]}% drawdown becomes the evidence`;
+      else if (lower.includes("exit liquidity")) angle = "followers-as-exit-liquidity charge";
+      else if (lower.includes("going to zero")) angle = "zero-call goes on the ledger";
+      else if (lower.includes("airdrop")) angle = "airdrop hindsight enters the chat";
+      else if (lower.includes("billion")) angle = "billion thesis gets defended";
+      else if (lower.includes("bagwork") || lower.includes("miles")) angle = "proof-of-work leaves the timeline";
+      else angle = sentenceCase(clean.split(/[.!?]/)[0] || "receipt archived").slice(0, 70);
+      return `${actor} | ${frame}: ${angle}`;
+    }
+
+    function summarizeTweetBody(copy, kind) {
+      const clean = compactTweetText(copy);
+      const lower = clean.toLowerCase();
+      const claims = [];
+      const percent = clean.match(/\bdown\s+(\d{1,3})%\b/i);
+      if (percent) claims.push(`claims the promoted coin is down ${percent[1]}%`);
+      if (lower.includes("exit liquidity")) claims.push("frames followers as potential exit liquidity");
+      if (lower.includes("shitcoin")) claims.push("attacks the coin quality directly");
+      if (lower.includes("shill")) claims.push("accuses the account of shilling");
+      if (lower.includes("going to zero") || /\bzero\b/.test(lower)) claims.push("puts a zero-call on record");
+      if (lower.includes("airdrop")) claims.push("argues an airdrop would have been better than buying");
+      if (lower.includes("execution") || lower.includes("roadmap")) claims.push("turns the complaint into an execution audit");
+      if (lower.includes("bagwork") || lower.includes("miles") || lower.includes("run")) claims.push("points to IRL work as the counterweight");
+      if (lower.includes("community")) claims.push("makes the community itself part of the thesis");
+      if (!claims.length) {
+        const firstSentence = clean.split(/[.!?]/).map((part) => part.trim()).filter(Boolean)[0] || clean;
+        return `${kind === "guardian" ? "Guardian receipt" : "FUD receipt"} archived: ${sentenceCase(firstSentence).slice(0, 170)}.`;
+      }
+      const prefix = kind === "guardian"
+        ? "Guardian-side receipt:"
+        : "FUD-side receipt:";
+      return `${prefix} ${sentenceCase(claims.join(", "))}. The original post is preserved as the source, but this card records the claim instead of copy-pasting the tweet.`;
     }
 
     function stripTrailingTweetUrlPunctuation(value) {
@@ -603,6 +679,12 @@ textarea:focus {
           text,
           eventDate: Number.isNaN(new Date(eventDate).getTime()) ? "" : eventDate,
           sourceHref: canonicalSourceHref,
+          metrics: {
+            views: Number(payload?.views?.count || payload?.view_count || 0) || 0,
+            likes: Number(payload?.favorite_count || payload?.favoriteCount || 0) || 0,
+            replies: Number(payload?.conversation_count || payload?.reply_count || 0) || 0,
+            reposts: Number(payload?.retweet_count || 0) || 0,
+          },
         };
       } catch (error) {
         console.error("Unable to fetch tweet details", error);
@@ -629,6 +711,7 @@ textarea:focus {
           text,
           eventDate,
           sourceHref: canonicalizeTweetUrl(String(payload?.url || sourceHref)),
+          metrics: { views: 0, likes: 0, replies: 0, reposts: 0 },
         };
       } catch (error) {
         console.error("Unable to fetch tweet oEmbed details", error);
@@ -651,17 +734,19 @@ textarea:focus {
       const pasted = buildTweetCopyFromPaste(rawText, sourceHref);
       const fetched = sourceHref ? await fetchTweetDetails(sourceHref) : null;
       const handle = fetched?.handle || pasted.handle || extractHandle(rawText, sourceHref);
-      const copy = pickBestTweetCopy(pasted.copy, fetched?.text) || String(rawText || "").trim();
+      const rawCopy = pickBestTweetCopy(pasted.copy, fetched?.text) || String(rawText || "").trim();
+      const copy = summarizeTweetBody(rawCopy, kind);
       const eventDate = fetched?.eventDate || extractDate(rawText) || tweetDate || new Date().toISOString();
       const resolvedSourceHref = fetched?.sourceHref || sourceHref;
       return {
         kind,
         eventDate,
-        title: summarizeTitle(copy, handle, kind),
+        title: summarizeTitle(rawCopy, handle, kind),
         copy,
-        tags: deriveTags(copy, kind),
+        tags: deriveTags(rawCopy, kind),
         sourceLabel: resolvedSourceHref && (resolvedSourceHref.includes("x.com") || resolvedSourceHref.includes("twitter.com")) ? "Open on X" : "Open source",
         sourceHref: resolvedSourceHref,
+        metrics: fetched?.metrics || { views: 0, likes: 0, replies: 0, reposts: 0 },
       };
     }
 
@@ -673,6 +758,7 @@ textarea:focus {
 
     function resetForm() {
       editingEntryId = null;
+      pendingEntryMetrics = { views: 0, likes: 0, replies: 0, reposts: 0 };
       document.getElementById("raw-paste").value = "";
       document.getElementById("entry-kind").value = "fud";
       document.getElementById("entry-date").value = toDatetimeLocalValue(new Date().toISOString());
@@ -697,6 +783,7 @@ textarea:focus {
       const sourceLabel = document.getElementById("entry-source-label").value.trim() || "Open on X";
       const sourceHref = document.getElementById("entry-source-href").value.trim();
       const eventDate = eventDateLocal ? new Date(eventDateLocal).toISOString() : new Date().toISOString();
+      const existingEntry = editingEntryId ? timelineItems.find((item) => item.id === editingEntryId) : null;
       return normalizeTimelineItem({
         id: editingEntryId || `finance-${Date.now()}`,
         kind,
@@ -707,10 +794,12 @@ textarea:focus {
         tags,
         sourceLabel,
         sourceHref,
+        metrics: existingEntry?.metrics || pendingEntryMetrics || { views: 0, likes: 0, replies: 0, reposts: 0 },
       });
     }
 
     function populateForm(entry) {
+      pendingEntryMetrics = entry.metrics || { views: 0, likes: 0, replies: 0, reposts: 0 };
       document.getElementById("entry-kind").value = entry.kind;
       document.getElementById("entry-date").value = toDatetimeLocalValue(entry.eventDate);
       document.getElementById("entry-title").value = entry.title;
@@ -897,6 +986,7 @@ textarea:focus {
         document.getElementById("entry-tags").value = parsed.tags.join(", ");
         document.getElementById("entry-source-label").value = parsed.sourceLabel;
         document.getElementById("entry-source-href").value = parsed.sourceHref;
+        pendingEntryMetrics = parsed.metrics || { views: 0, likes: 0, replies: 0, reposts: 0 };
         renderPreview();
         setStatus("Paste parsed. Review the fields and save when ready.");
       } finally {

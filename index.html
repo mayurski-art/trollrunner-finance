@@ -813,6 +813,16 @@ h1 {
   margin-bottom: 12px;
 }
 
+.timeline-control-row,
+.timeline-filter-bar,
+.timeline-sort-bar,
+.timeline-month-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
 .timeline-mode-btn {
   border: 1px solid rgba(126, 255, 142, 0.18);
   background: rgba(126, 255, 142, 0.05);
@@ -829,6 +839,50 @@ h1 {
 .timeline-mode-btn.is-active {
   background: rgba(126, 255, 142, 0.16);
   color: var(--text);
+}
+
+.timeline-filter-btn,
+.timeline-sort-btn,
+.timeline-month-btn {
+  border: 1px solid rgba(216, 255, 224, 0.14);
+  background: rgba(216, 255, 224, 0.04);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.timeline-filter-btn:hover,
+.timeline-filter-btn.is-active,
+.timeline-sort-btn:hover,
+.timeline-sort-btn.is-active,
+.timeline-month-btn:hover,
+.timeline-month-btn.is-active {
+  border-color: rgba(126, 255, 142, 0.32);
+  background: rgba(126, 255, 142, 0.14);
+  color: var(--text);
+}
+
+.timeline-filter-btn {
+  border-radius: 999px;
+}
+
+.timeline-month-bar {
+  max-height: 94px;
+  overflow: auto;
+  padding-bottom: 2px;
+}
+
+.timeline-empty {
+  padding: 18px;
+  border: 1px dashed rgba(126, 255, 142, 0.18);
+  border-radius: 10px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 13px;
 }
 
 .timeline-item {
@@ -901,6 +955,55 @@ h1 {
   color: var(--muted);
   line-height: 1.6;
   font-size: 14px;
+}
+
+.timeline-score {
+  margin-top: 10px;
+  color: rgba(216, 255, 224, 0.62);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.leaderboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.leaderboard-card {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(126, 255, 142, 0.14);
+  background: rgba(126, 255, 142, 0.05);
+}
+
+.leaderboard-rank {
+  color: var(--accent);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.leaderboard-name {
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.leaderboard-meta {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.leaderboard-score {
+  margin-top: 8px;
+  color: var(--accent);
+  font-size: 18px;
+  font-weight: 700;
 }
 
 .transfers-header {
@@ -1171,7 +1274,7 @@ h1 {
 
 @media (max-width: 860px) {
   .hero-grid { grid-template-columns: 1fr; }
-  .stats, .grid, .death-summary, .chart-notes, .chart-meta { grid-template-columns: 1fr; }
+  .stats, .grid, .death-summary, .chart-notes, .chart-meta, .leaderboard-grid { grid-template-columns: 1fr; }
   .timeline-item { grid-template-columns: 1fr; gap: 8px; }
   h1 { font-size: 28px; }
   .death-ledger-copy h2 { font-size: 24px; }
@@ -1317,6 +1420,7 @@ h1 {
         </aside>
         <nav class="death-ledger-nav" aria-label="Trolldeaths sections">
           <a class="death-pill" href="#death-chart">Chart</a>
+          <a class="death-pill" href="#death-leaderboard">Leaderboard</a>
           <a class="death-pill" href="#death-timeline">Timeline</a>
         </nav>
       </div>
@@ -1367,6 +1471,16 @@ h1 {
           </div>
         </section>
 
+        <section id="death-leaderboard" class="death-panel" aria-labelledby="death-leaderboard-heading">
+          <div class="death-panel-header">
+            <div>
+              <h3 id="death-leaderboard-heading">Receipt Leaderboard</h3>
+              <p>Scores blend receipt count, side of the ledger, and public engagement when the tweet data includes it.</p>
+            </div>
+          </div>
+          <div id="leaderboard-grid" class="leaderboard-grid"></div>
+        </section>
+
     <section id="death-timeline" class="death-panel" aria-labelledby="death-timeline-heading">
           <div class="death-panel-header">
             <div>
@@ -1379,6 +1493,9 @@ h1 {
             <button id="timeline-mode-fud" class="timeline-mode-btn" type="button">FUD Mode</button>
             <button id="timeline-mode-guardian" class="timeline-mode-btn" type="button">Guardian Mode</button>
           </div>
+          <div id="timeline-sort-bar" class="timeline-sort-bar" aria-label="Timeline sort order"></div>
+          <div id="timeline-filter-bar" class="timeline-filter-bar" aria-label="Timeline tags"></div>
+          <div id="timeline-month-bar" class="timeline-month-bar" aria-label="Timeline months"></div>
           <div id="timeline-list" class="timeline-list"></div>
         </section>
       </div>
@@ -1716,6 +1833,9 @@ h1 {
     const DEFAULT_TIMELINE_ITEMS = [];
     let financeTimelineItems = DEFAULT_TIMELINE_ITEMS.map((item) => ({ ...item, tags: Array.isArray(item.tags) ? [...item.tags] : [] }));
     let activeTimelineMode = "all";
+    let activeTimelineTag = "all";
+    let activeTimelineMonth = "all";
+    let activeTimelineSort = "newest";
     let activeChartRange = DEFAULT_CHART_RANGE;
     let cachedChartSeries = new Map();
     let latestChartPoints = [];
@@ -1744,6 +1864,16 @@ h1 {
         minimumFractionDigits: 2,
         maximumFractionDigits: fractionDigits,
       });
+    }
+
+    function escapeHtml(value) {
+      return String(value || "").replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      }[ch]));
     }
 
     function isSupabaseConfigured() {
@@ -1778,6 +1908,11 @@ h1 {
       const tags = Array.isArray(item.tags)
         ? item.tags.map((tag) => String(tag || "").trim()).filter(Boolean).slice(0, 4)
         : [];
+      const metrics = item.metrics && typeof item.metrics === "object" ? item.metrics : {};
+      const views = Number(item.views ?? metrics.views ?? metrics.viewCount ?? 0) || 0;
+      const likes = Number(item.likes ?? metrics.likes ?? metrics.favoriteCount ?? 0) || 0;
+      const replies = Number(item.replies ?? item.comments ?? metrics.replies ?? metrics.replyCount ?? metrics.comments ?? 0) || 0;
+      const reposts = Number(item.reposts ?? item.retweets ?? metrics.reposts ?? metrics.retweets ?? metrics.retweetCount ?? 0) || 0;
       const title = String(item.title || "").trim();
       const copy = String(item.copy || "").trim();
       if (!title || !copy) return null;
@@ -1791,11 +1926,55 @@ h1 {
         copy,
         sourceLabel,
         sourceHref: sourceHref || "#",
+        metrics: { views, likes, replies, reposts },
       };
     }
 
     function sortTimelineItems(items) {
       return [...items].sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
+    }
+
+    function getItemMonthKey(item) {
+      const date = new Date(item?.eventDate || Date.now());
+      if (Number.isNaN(date.getTime())) return "unknown";
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    }
+
+    function formatMonthKey(monthKey) {
+      if (monthKey === "all") return "All Months";
+      const [year, month] = String(monthKey || "").split("-");
+      const parsed = new Date(Number(year), Number(month) - 1, 1);
+      if (Number.isNaN(parsed.getTime())) return "Unknown";
+      return parsed.toLocaleString(undefined, { month: "short", year: "numeric" });
+    }
+
+    function getTimelineHandle(item) {
+      const titleHandle = String(item?.title || "").match(/^([^:]{2,32}):/);
+      if (titleHandle) return titleHandle[1].replace(/^@/, "").trim();
+      const sourceHandle = String(item?.sourceHref || "").match(/(?:x|twitter)\.com\/([A-Za-z0-9_]+)/i);
+      return sourceHandle ? sourceHandle[1] : "unknown";
+    }
+
+    function getItemScore(item) {
+      const metrics = item?.metrics || {};
+      const views = Number(metrics.views || 0);
+      const likes = Number(metrics.likes || 0);
+      const replies = Number(metrics.replies || 0);
+      const reposts = Number(metrics.reposts || 0);
+      const modeWeight = item?.kind === "fud" ? 24 : 18;
+      const engagement = (views / 120) + (likes * 3) + (replies * 7) + (reposts * 5);
+      return Math.round(modeWeight + engagement);
+    }
+
+    function sortByActiveTimelineSort(items) {
+      const list = [...items];
+      if (activeTimelineSort === "popular") {
+        return list.sort((a, b) => getItemScore(b) - getItemScore(a) || new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
+      }
+      if (activeTimelineSort === "oldest") {
+        return list.sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+      }
+      return sortTimelineItems(list);
     }
 
     function cloneNormalizedTimeline(items) {
@@ -2293,9 +2472,18 @@ h1 {
     }
 
     function getActiveTimelineItems() {
-      if (activeTimelineMode === "all") return sortTimelineItems(financeTimelineItems);
-      const targetKind = activeTimelineMode === "guardian" ? "guardian" : "fud";
-      return sortTimelineItems(financeTimelineItems.filter((item) => item.kind === targetKind));
+      let items = financeTimelineItems;
+      if (activeTimelineMode !== "all") {
+        const targetKind = activeTimelineMode === "guardian" ? "guardian" : "fud";
+        items = items.filter((item) => item.kind === targetKind);
+      }
+      if (activeTimelineTag !== "all") {
+        items = items.filter((item) => item.tags.includes(activeTimelineTag));
+      }
+      if (activeTimelineMonth !== "all") {
+        items = items.filter((item) => getItemMonthKey(item) === activeTimelineMonth);
+      }
+      return sortByActiveTimelineSort(items);
     }
 
     function getAllChartEvents() {
@@ -2363,10 +2551,10 @@ h1 {
           popoverEl.style.left = `${clampedLeft}px`;
           popoverEl.style.top = `${clampedTop}px`;
           popoverEl.innerHTML = `
-            <div class="chart-event-popover-meta">${fmtCompactDateTime(eventTime)} | ~$${fmtPrice(nearest[1])}</div>
-            <h4>${item.title}</h4>
-            <p>${item.copy}</p>
-            <a class="chart-event-popover-link" href="${item.sourceHref}" target="_blank" rel="noopener noreferrer">${item.sourceLabel}</a>
+            <div class="chart-event-popover-meta">${escapeHtml(fmtCompactDateTime(eventTime))} | ~$${escapeHtml(fmtPrice(nearest[1]))}</div>
+            <h4>${escapeHtml(item.title)}</h4>
+            <p>${escapeHtml(item.copy)}</p>
+            <a class="chart-event-popover-link" href="${escapeHtml(item.sourceHref)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.sourceLabel)}</a>
           `;
           popoverEl.hidden = false;
         });
@@ -2443,10 +2631,116 @@ h1 {
       renderTrollDeaths();
     }
 
+    function setTimelineTag(nextTag) {
+      activeTimelineTag = nextTag || "all";
+      renderTrollDeaths();
+    }
+
+    function setTimelineMonth(nextMonth) {
+      activeTimelineMonth = nextMonth || "all";
+      renderTrollDeaths();
+    }
+
+    function setTimelineSort(nextSort) {
+      activeTimelineSort = nextSort || "newest";
+      renderTrollDeaths();
+    }
+
     function setupTimelineModeButtons() {
       document.getElementById("timeline-mode-all")?.addEventListener("click", () => setTimelineMode("all"));
       document.getElementById("timeline-mode-fud")?.addEventListener("click", () => setTimelineMode("fud"));
       document.getElementById("timeline-mode-guardian")?.addEventListener("click", () => setTimelineMode("guardian"));
+    }
+
+    function renderTimelineControls() {
+      const tagEl = document.getElementById("timeline-filter-bar");
+      const monthEl = document.getElementById("timeline-month-bar");
+      const sortEl = document.getElementById("timeline-sort-bar");
+      if (sortEl) {
+        const sortOptions = [
+          ["newest", "Newest"],
+          ["popular", "Most Popular"],
+          ["oldest", "Oldest"],
+        ];
+        sortEl.innerHTML = sortOptions.map(([value, label]) => `
+          <button class="timeline-sort-btn ${activeTimelineSort === value ? "is-active" : ""}" type="button" data-sort="${escapeHtml(value)}">${escapeHtml(label)}</button>
+        `).join("");
+        sortEl.querySelectorAll("[data-sort]").forEach((button) => {
+          button.addEventListener("click", () => setTimelineSort(button.dataset.sort));
+        });
+      }
+      if (tagEl) {
+        const counts = new Map();
+        financeTimelineItems.forEach((item) => item.tags.forEach((tag) => counts.set(tag, (counts.get(tag) || 0) + 1)));
+        const topTags = [...counts.entries()]
+          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+          .slice(0, 12);
+        if (activeTimelineTag !== "all" && !counts.has(activeTimelineTag)) activeTimelineTag = "all";
+        tagEl.innerHTML = [
+          `<button class="timeline-filter-btn ${activeTimelineTag === "all" ? "is-active" : ""}" type="button" data-tag="all">All Tags</button>`,
+          ...topTags.map(([tag, count]) => `<button class="timeline-filter-btn ${activeTimelineTag === tag ? "is-active" : ""}" type="button" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)} ${count}</button>`)
+        ].join("");
+        tagEl.querySelectorAll("[data-tag]").forEach((button) => {
+          button.addEventListener("click", () => setTimelineTag(button.dataset.tag));
+        });
+      }
+      if (monthEl) {
+        const months = [...new Set(sortTimelineItems(financeTimelineItems).map(getItemMonthKey))];
+        if (activeTimelineMonth !== "all" && !months.includes(activeTimelineMonth)) activeTimelineMonth = "all";
+        monthEl.innerHTML = [
+          `<button class="timeline-month-btn ${activeTimelineMonth === "all" ? "is-active" : ""}" type="button" data-month="all">All Months</button>`,
+          ...months.map((month) => `<button class="timeline-month-btn ${activeTimelineMonth === month ? "is-active" : ""}" type="button" data-month="${escapeHtml(month)}">${escapeHtml(formatMonthKey(month))}</button>`)
+        ].join("");
+        monthEl.querySelectorAll("[data-month]").forEach((button) => {
+          button.addEventListener("click", () => setTimelineMonth(button.dataset.month));
+        });
+      }
+    }
+
+    function renderLeaderboard() {
+      const gridEl = document.getElementById("leaderboard-grid");
+      if (!gridEl) return;
+      const byHandle = new Map();
+      for (const item of financeTimelineItems) {
+        const handle = getTimelineHandle(item);
+        const current = byHandle.get(handle) || {
+          handle,
+          receipts: 0,
+          fud: 0,
+          guardian: 0,
+          views: 0,
+          likes: 0,
+          replies: 0,
+          reposts: 0,
+          score: 0,
+        };
+        const metrics = item.metrics || {};
+        current.receipts += 1;
+        current.fud += item.kind === "fud" ? 1 : 0;
+        current.guardian += item.kind === "guardian" ? 1 : 0;
+        current.views += Number(metrics.views || 0);
+        current.likes += Number(metrics.likes || 0);
+        current.replies += Number(metrics.replies || 0);
+        current.reposts += Number(metrics.reposts || 0);
+        current.score += getItemScore(item);
+        byHandle.set(handle, current);
+      }
+      const leaders = [...byHandle.values()]
+        .sort((a, b) => b.score - a.score || b.receipts - a.receipts || a.handle.localeCompare(b.handle))
+        .slice(0, 6);
+      if (!leaders.length) {
+        gridEl.innerHTML = `<div class="timeline-empty">No leaderboard data yet.</div>`;
+        return;
+      }
+      gridEl.innerHTML = leaders.map((leader, index) => `
+        <article class="leaderboard-card">
+          <div class="leaderboard-rank">Rank ${index + 1}</div>
+          <div class="leaderboard-name">@${escapeHtml(leader.handle)}</div>
+          <div class="leaderboard-score">${leader.score.toLocaleString()} pts</div>
+          <div class="leaderboard-meta">${leader.receipts} receipts | ${leader.fud} FUD | ${leader.guardian} Guardian</div>
+          <div class="leaderboard-meta">${leader.views.toLocaleString()} views | ${leader.likes.toLocaleString()} likes | ${leader.replies.toLocaleString()} replies</div>
+        </article>
+      `).join("");
     }
 
     function renderTrollDeaths() {
@@ -2460,28 +2754,33 @@ h1 {
 
       if (totalEl) totalEl.textContent = financeTimelineItems.length.toString();
       if (latestEl) latestEl.textContent = latestTheme;
+      renderTimelineControls();
+      renderLeaderboard();
+      const currentChartPrice = Number(latestChartPoints[latestChartPoints.length - 1]?.[1] || latestTrollUsd || 0);
+      renderDeathRollup(currentChartPrice);
 
       if (chartNotesEl) {
         chartNotesEl.innerHTML = TROLL_DEATH_NOTES.map((item) => `
           <article class="chart-note">
-            <strong>${item.title}</strong>
-            <span>${item.copy}</span>
+            <strong>${escapeHtml(item.title)}</strong>
+            <span>${escapeHtml(item.copy)}</span>
           </article>
         `).join("");
       }
 
       if (timelineEl) {
-        timelineEl.innerHTML = activeItems.map((item) => `
+        timelineEl.innerHTML = activeItems.length ? activeItems.map((item) => `
           <article class="timeline-item">
-            <div class="timeline-date">${item.date}</div>
+            <div class="timeline-date">${escapeHtml(item.date)}</div>
             <div class="timeline-card">
-              <div class="timeline-tags">${item.tags.map((tag) => `<span class="timeline-tag">${tag}</span>`).join("")}</div>
-              <h4>${item.title}</h4>
-              <p>${item.copy}</p>
-              <a class="timeline-source" href="${item.sourceHref}" target="_blank" rel="noopener noreferrer">${item.sourceLabel}</a>
+              <div class="timeline-tags">${item.tags.map((tag) => `<span class="timeline-tag">${escapeHtml(tag)}</span>`).join("")}</div>
+              <h4>${escapeHtml(item.title)}</h4>
+              <p>${escapeHtml(item.copy)}</p>
+              <div class="timeline-score">Receipt score: ${getItemScore(item).toLocaleString()}${item.metrics?.views ? ` | ${Number(item.metrics.views).toLocaleString()} views` : ""}${item.metrics?.likes ? ` | ${Number(item.metrics.likes).toLocaleString()} likes` : ""}</div>
+              <a class="timeline-source" href="${escapeHtml(item.sourceHref)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.sourceLabel)}</a>
             </div>
           </article>
-        `).join("");
+        `).join("") : `<div class="timeline-empty">No receipts match this filter yet.</div>`;
       }
 
     }
