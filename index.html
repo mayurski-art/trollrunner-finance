@@ -1044,47 +1044,6 @@ h1 {
   font-weight: 700;
 }
 
-.leaderboard-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.leaderboard-card {
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(126, 255, 142, 0.14);
-  background: rgba(126, 255, 142, 0.05);
-}
-
-.leaderboard-rank {
-  color: var(--accent);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.leaderboard-name {
-  margin-top: 6px;
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.leaderboard-meta {
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.leaderboard-score {
-  margin-top: 8px;
-  color: var(--accent);
-  font-size: 18px;
-  font-weight: 700;
-}
-
 .transfers-header {
   display: flex;
   justify-content: space-between;
@@ -1353,7 +1312,7 @@ h1 {
 
 @media (max-width: 860px) {
   .hero-grid { grid-template-columns: 1fr; }
-  .stats, .grid, .death-summary, .chart-notes, .chart-meta, .leaderboard-grid { grid-template-columns: 1fr; }
+  .stats, .grid, .death-summary, .chart-notes, .chart-meta { grid-template-columns: 1fr; }
   .timeline-item { grid-template-columns: 1fr; gap: 8px; }
   h1 { font-size: 28px; }
   .death-ledger-copy h2 { font-size: 24px; }
@@ -1504,7 +1463,6 @@ h1 {
         </aside>
         <nav class="death-ledger-nav" aria-label="Trolldeaths sections">
           <a class="death-pill" href="#death-chart">Chart</a>
-          <a class="death-pill" href="#death-leaderboard">Leaderboard</a>
           <a class="death-pill" href="#death-timeline">Timeline</a>
         </nav>
       </div>
@@ -1554,16 +1512,6 @@ h1 {
             <div id="chart-meta" class="chart-meta"></div>
             <div id="chart-notes" class="chart-notes"></div>
           </div>
-        </section>
-
-        <section id="death-leaderboard" class="death-panel" aria-labelledby="death-leaderboard-heading">
-          <div class="death-panel-header">
-            <div>
-              <h3 id="death-leaderboard-heading">Receipt Leaderboard</h3>
-              <p>Scores blend receipt count, side of the ledger, and public engagement when the tweet data includes it.</p>
-            </div>
-          </div>
-          <div id="leaderboard-grid" class="leaderboard-grid"></div>
         </section>
 
     <section id="death-timeline" class="death-panel" aria-labelledby="death-timeline-heading">
@@ -2947,52 +2895,6 @@ h1 {
       }
     }
 
-    function renderLeaderboard() {
-      const gridEl = document.getElementById("leaderboard-grid");
-      if (!gridEl) return;
-      const byHandle = new Map();
-      for (const item of financeTimelineItems) {
-        const handle = getTimelineHandle(item);
-        const current = byHandle.get(handle) || {
-          handle,
-          receipts: 0,
-          fud: 0,
-          guardian: 0,
-          views: 0,
-          likes: 0,
-          replies: 0,
-          reposts: 0,
-          score: 0,
-        };
-        const metrics = item.metrics || {};
-        current.receipts += 1;
-        current.fud += item.kind === "fud" ? 1 : 0;
-        current.guardian += item.kind === "guardian" ? 1 : 0;
-        current.views += Number(metrics.views || 0);
-        current.likes += Number(metrics.likes || 0);
-        current.replies += Number(metrics.replies || 0);
-        current.reposts += Number(metrics.reposts || 0);
-        current.score += getItemScore(item);
-        byHandle.set(handle, current);
-      }
-      const leaders = [...byHandle.values()]
-        .sort((a, b) => b.score - a.score || b.receipts - a.receipts || a.handle.localeCompare(b.handle))
-        .slice(0, 6);
-      if (!leaders.length) {
-        gridEl.innerHTML = `<div class="timeline-empty">No leaderboard data yet.</div>`;
-        return;
-      }
-      gridEl.innerHTML = leaders.map((leader, index) => `
-        <article class="leaderboard-card">
-          <div class="leaderboard-rank">Rank ${index + 1}</div>
-          <div class="leaderboard-name">@${escapeHtml(leader.handle)}</div>
-          <div class="leaderboard-score">${leader.score.toLocaleString()} pts</div>
-          <div class="leaderboard-meta">${leader.receipts} receipts | ${leader.fud} FUD | ${leader.guardian} Guardian</div>
-          <div class="leaderboard-meta">${leader.views.toLocaleString()} views | ${leader.likes.toLocaleString()} likes | ${leader.replies.toLocaleString()} replies | ${leader.reposts.toLocaleString()} reposts</div>
-        </article>
-      `).join("");
-    }
-
     function renderTrollDeaths() {
       const activeItems = getActiveTimelineItems();
       const fudItems = sortTimelineItems(financeTimelineItems.filter((item) => item.kind === "fud"));
@@ -3005,7 +2907,6 @@ h1 {
       if (totalEl) totalEl.textContent = financeTimelineItems.length.toString();
       if (latestEl) latestEl.textContent = latestTheme;
       renderTimelineControls();
-      renderLeaderboard();
       const currentChartPrice = Number(latestChartPoints[latestChartPoints.length - 1]?.[1] || latestTrollUsd || 0);
       renderDeathRollup(currentChartPrice);
 
