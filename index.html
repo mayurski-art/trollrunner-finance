@@ -1570,7 +1570,7 @@ h1 {
           <div class="death-panel-header">
             <div>
               <h3 id="death-timeline-heading">Timeline</h3>
-              <p id="timeline-mode-copy">Each row is a moment where the anti-TROLL thesis got loud enough to archive.</p>
+              <p id="timeline-mode-copy">Open Timeline Controls and choose a mode, tag, or month to load archived receipts.</p>
             </div>
           </div>
           <button id="timeline-tools-toggle" class="timeline-tools-toggle" type="button" aria-expanded="false" aria-controls="timeline-tools">
@@ -1578,7 +1578,7 @@ h1 {
           </button>
           <div id="timeline-tools" class="timeline-tools" hidden>
             <div class="timeline-mode-bar" aria-label="Timeline mode">
-              <button id="timeline-mode-all" class="timeline-mode-btn is-active" type="button">All Receipts</button>
+              <button id="timeline-mode-all" class="timeline-mode-btn" type="button">All Receipts</button>
               <button id="timeline-mode-fud" class="timeline-mode-btn" type="button">FUD Mode</button>
               <button id="timeline-mode-guardian" class="timeline-mode-btn" type="button">Guardian Mode</button>
             </div>
@@ -1928,7 +1928,7 @@ h1 {
     ];
     const DEFAULT_TIMELINE_ITEMS = [];
     let financeTimelineItems = DEFAULT_TIMELINE_ITEMS.map((item) => ({ ...item, tags: Array.isArray(item.tags) ? [...item.tags] : [] }));
-    let activeTimelineMode = "all";
+    let activeTimelineMode = "";
     let activeTimelineTags = new Set();
     let activeTimelineMonths = new Set();
     let activeTimelineSort = "newest";
@@ -2674,8 +2674,11 @@ h1 {
     }
 
     function getActiveTimelineItems() {
+      if (!activeTimelineMode && !activeTimelineTags.size && !activeTimelineMonths.size) {
+        return [];
+      }
       let items = financeTimelineItems;
-      if (activeTimelineMode !== "all") {
+      if (activeTimelineMode && activeTimelineMode !== "all") {
         const targetKind = activeTimelineMode === "guardian" ? "guardian" : "fud";
         items = items.filter((item) => item.kind === targetKind);
       }
@@ -2828,7 +2831,9 @@ h1 {
           ? "Guardian Mode tracks the higher-signal defenses, community pushback, and pro-TROLL counterposts I could verify."
           : nextMode === "fud"
             ? "Each row is a moment where the anti-TROLL thesis got loud enough to archive."
-            : "All Receipts combines FUD and Guardian posts so every archived tweet shows up in one shared feed.";
+            : nextMode === "all"
+              ? "All Receipts combines FUD and Guardian posts so every archived tweet shows up in one shared feed."
+              : "Open Timeline Controls and choose a mode, tag, or month to load archived receipts.";
       }
       renderTrollDeaths();
     }
@@ -2861,11 +2866,11 @@ h1 {
     }
 
     function resetTimelineFilters() {
-      activeTimelineMode = "all";
+      activeTimelineMode = "";
       activeTimelineTags.clear();
       activeTimelineMonths.clear();
       activeTimelineSort = "newest";
-      setTimelineMode("all");
+      setTimelineMode("");
     }
 
     function syncTimelineTools() {
@@ -3026,7 +3031,7 @@ h1 {
               <a class="timeline-source" href="${escapeHtml(item.sourceHref)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.sourceLabel)}</a>
             </div>
           </article>
-        `).join("") : `<div class="timeline-empty">No receipts match this filter yet.</div>`;
+        `).join("") : `<div class="timeline-empty">${activeTimelineMode || activeTimelineTags.size || activeTimelineMonths.size ? "No receipts match this filter yet." : "Open Timeline Controls and choose a mode, tag, or month to load archived receipts."}</div>`;
       }
 
     }
