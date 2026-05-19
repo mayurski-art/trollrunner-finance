@@ -665,7 +665,10 @@ h1 {
 
 .chart-events-layer {
   position: absolute;
-  inset: 18px 14px 44px 14px;
+  top: 18px;
+  left: 14px;
+  right: 14px;
+  height: 250px;
   pointer-events: none;
 }
 
@@ -673,28 +676,29 @@ h1 {
   position: absolute;
   width: 22px;
   height: 22px;
-  margin-left: -11px;
-  margin-top: -11px;
   border: 0;
   background: transparent;
   box-shadow: none;
   cursor: pointer;
   pointer-events: auto;
   font-size: 16px;
-  line-height: 1;
+  line-height: 22px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  transform: translate(-50%, -50%);
   filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.3));
   font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
+  text-align: center;
 }
 
 .chart-event-node:hover,
 .chart-event-node.is-active {
-  transform: scale(1.12);
+  transform: translate(-50%, -50%) scale(1.12);
 }
 
 .chart-event-node-fud {
@@ -840,6 +844,15 @@ h1 {
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 12px;
+}
+
+.timeline-control-label {
+  width: 100%;
+  color: rgba(216, 255, 224, 0.58);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .timeline-control-row,
@@ -1348,9 +1361,8 @@ h1 {
   .chart-event-node {
     width: 26px;
     height: 26px;
-    margin-left: -13px;
-    margin-top: -13px;
     font-size: 18px;
+    line-height: 26px;
   }
 }
 
@@ -1919,7 +1931,7 @@ h1 {
     let financeTimelineItems = DEFAULT_TIMELINE_ITEMS.map((item) => ({ ...item, tags: Array.isArray(item.tags) ? [...item.tags] : [] }));
     let activeTimelineMode = "all";
     let activeTimelineTags = new Set();
-    let activeTimelineMonth = "all";
+    let activeTimelineMonths = new Set();
     let activeTimelineSort = "newest";
     let timelineToolsOpen = false;
     let timelineMetricSyncAttempted = false;
@@ -1993,7 +2005,7 @@ h1 {
       const sourceHref = String(item.sourceHref || "").trim();
       const sourceLabel = String(item.sourceLabel || (sourceHref.includes("x.com") || sourceHref.includes("twitter.com") ? "Open on X" : "Open source")).trim() || "Open source";
       const tags = Array.isArray(item.tags)
-        ? item.tags.map((tag) => String(tag || "").trim()).filter(Boolean).slice(0, 4)
+        ? item.tags.map((tag) => String(tag || "").trim()).filter(Boolean).slice(0, 6)
         : [];
       const metrics = item.metrics && typeof item.metrics === "object" ? item.metrics : {};
       const views = Number(item.views ?? metrics.views ?? metrics.viewCount ?? 0) || 0;
@@ -2032,7 +2044,7 @@ h1 {
       const [year, month] = String(monthKey || "").split("-");
       const parsed = new Date(Number(year), Number(month) - 1, 1);
       if (Number.isNaN(parsed.getTime())) return "Unknown";
-      return parsed.toLocaleString(undefined, { month: "short", year: "numeric" });
+      return parsed.toLocaleString(undefined, { month: "long", year: "numeric" });
     }
 
     function getItemDateKey(item) {
@@ -2671,8 +2683,8 @@ h1 {
       if (activeTimelineTags.size) {
         items = items.filter((item) => item.tags.some((tag) => activeTimelineTags.has(tag)));
       }
-      if (activeTimelineMonth !== "all") {
-        items = items.filter((item) => getItemDateKey(item) === activeTimelineMonth);
+      if (activeTimelineMonths.size) {
+        items = items.filter((item) => activeTimelineMonths.has(getItemMonthKey(item)));
       }
       return sortByActiveTimelineSort(items);
     }
@@ -2834,7 +2846,13 @@ h1 {
     }
 
     function setTimelineMonth(nextMonth) {
-      activeTimelineMonth = nextMonth || "all";
+      if (!nextMonth || nextMonth === "all") {
+        activeTimelineMonths.clear();
+      } else if (activeTimelineMonths.has(nextMonth)) {
+        activeTimelineMonths.delete(nextMonth);
+      } else {
+        activeTimelineMonths.add(nextMonth);
+      }
       renderTrollDeaths();
     }
 
@@ -2846,7 +2864,7 @@ h1 {
     function resetTimelineFilters() {
       activeTimelineMode = "all";
       activeTimelineTags.clear();
-      activeTimelineMonth = "all";
+      activeTimelineMonths.clear();
       activeTimelineSort = "newest";
       setTimelineMode("all");
     }
@@ -2907,11 +2925,17 @@ h1 {
         });
       }
       if (monthEl) {
-        const dates = [...new Set(sortTimelineItems(financeTimelineItems).map(getItemDateKey))];
-        if (activeTimelineMonth !== "all" && !dates.includes(activeTimelineMonth)) activeTimelineMonth = "all";
+        const monthCounts = new Map();
+        sortTimelineItems(financeTimelineItems).forEach((item) => {
+          const monthKey = getItemMonthKey(item);
+          monthCounts.set(monthKey, (monthCounts.get(monthKey) || 0) + 1);
+        });
+        const months = [...monthCounts.keys()];
+        activeTimelineMonths = new Set([...activeTimelineMonths].filter((month) => monthCounts.has(month)));
         monthEl.innerHTML = [
-          `<button class="timeline-month-btn ${activeTimelineMonth === "all" ? "is-active" : ""}" type="button" data-month="all">All Dates</button>`,
-          ...dates.map((date) => `<button class="timeline-month-btn ${activeTimelineMonth === date ? "is-active" : ""}" type="button" data-month="${escapeHtml(date)}">${escapeHtml(formatDateKey(date))}</button>`)
+          `<span class="timeline-control-label">Month / year</span>`,
+          `<button class="timeline-month-btn ${activeTimelineMonths.size === 0 ? "is-active" : ""}" type="button" data-month="all">All Months</button>`,
+          ...months.map((month) => `<button class="timeline-month-btn ${activeTimelineMonths.has(month) ? "is-active" : ""}" type="button" data-month="${escapeHtml(month)}">${escapeHtml(formatMonthKey(month))} ${monthCounts.get(month)}</button>`)
         ].join("");
         monthEl.querySelectorAll("[data-month]").forEach((button) => {
           button.addEventListener("click", () => setTimelineMonth(button.dataset.month));

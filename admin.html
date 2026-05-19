@@ -376,6 +376,17 @@ textarea:focus {
       return `${month}. ${parsed.getDate()}, ${parsed.getFullYear()}`;
     }
 
+    function formatMonthTag(value) {
+      const parsed = new Date(value || Date.now());
+      if (Number.isNaN(parsed.getTime())) return "";
+      return parsed.toLocaleString(undefined, { month: "long", year: "numeric" }).toLowerCase().replace(/\s+/g, "-");
+    }
+
+    function withEventMonthTag(tags, eventDate) {
+      const monthTag = formatMonthTag(eventDate);
+      return [...new Set([monthTag, ...tags].filter(Boolean))].slice(0, 6);
+    }
+
     function normalizeTimelineItem(item) {
       if (!item || typeof item !== "object") return null;
       const kind = String(item.kind || "fud").toLowerCase() === "guardian" ? "guardian" : "fud";
@@ -386,7 +397,7 @@ textarea:focus {
       const parsedDate = new Date(rawDate);
       const eventDate = Number.isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
       const tags = Array.isArray(item.tags)
-        ? item.tags.map((tag) => String(tag || "").trim()).filter(Boolean).slice(0, 4)
+        ? withEventMonthTag(item.tags.map((tag) => String(tag || "").trim()).filter(Boolean), eventDate)
         : [];
       const metrics = item.metrics && typeof item.metrics === "object" ? item.metrics : {};
       const views = Number(item.views ?? metrics.views ?? metrics.viewCount ?? 0) || 0;
@@ -445,7 +456,7 @@ textarea:focus {
       ].map(([label, value]) => `${formatMetricCount(value)} ${label}`).join(" | ");
     }
 
-    function deriveTags(copy, kind) {
+    function deriveTags(copy, kind, eventDate = "") {
       const text = String(copy || "").toLowerCase();
       const orderedTags = [];
       const tagMap = [
@@ -473,7 +484,7 @@ textarea:focus {
       }
       if (kind === "guardian" && !orderedTags.includes("community")) orderedTags.push("community");
       if (kind === "fud" && !orderedTags.includes("receipts")) orderedTags.push("receipts");
-      return [...new Set(orderedTags)].slice(0, 4);
+      return withEventMonthTag(orderedTags, eventDate);
     }
 
     function sentenceCase(value) {
@@ -606,6 +617,11 @@ textarea:focus {
         const match = String(text || "").match(pattern);
         if (!match) continue;
         const parsed = new Date(match[0].replace("·", " "));
+        if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+      }
+      const monthYear = String(text || "").match(/\b[A-Za-z]{3,9}\.?\s+\d{4}\b/i);
+      if (monthYear) {
+        const parsed = new Date(`${monthYear[0].replace(".", "")} 1`);
         if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
       }
       return "";
@@ -765,7 +781,7 @@ textarea:focus {
         eventDate,
         title: summarizeTitle(rawCopy, handle, kind),
         copy,
-        tags: deriveTags(rawCopy, kind),
+        tags: deriveTags(rawCopy, kind, eventDate),
         sourceLabel: resolvedSourceHref && (resolvedSourceHref.includes("x.com") || resolvedSourceHref.includes("twitter.com")) ? "Open on X" : "Open source",
         sourceHref: resolvedSourceHref,
         metrics: fetched?.metrics || { views: 0, likes: 0, replies: 0, reposts: 0 },
@@ -801,7 +817,7 @@ textarea:focus {
         .split(",")
         .map((tag) => tag.trim())
         .filter(Boolean)
-        .slice(0, 4);
+        .slice(0, 6);
       const sourceLabel = document.getElementById("entry-source-label").value.trim() || "Open on X";
       const sourceHref = document.getElementById("entry-source-href").value.trim();
       const eventDate = eventDateLocal ? new Date(eventDateLocal).toISOString() : new Date().toISOString();
