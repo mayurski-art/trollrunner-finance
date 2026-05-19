@@ -990,6 +990,23 @@ h1 {
   letter-spacing: 0.08em;
 }
 
+.timeline-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.timeline-metric {
+  border: 1px solid rgba(216, 255, 224, 0.14);
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: rgba(216, 255, 224, 0.05);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .leaderboard-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1867,6 +1884,7 @@ h1 {
     let activeTimelineMonth = "all";
     let activeTimelineSort = "newest";
     let timelineToolsOpen = false;
+    let timelineMetricSyncAttempted = false;
     let activeChartRange = DEFAULT_CHART_RANGE;
     let cachedChartSeries = new Map();
     let latestChartPoints = [];
@@ -2025,6 +2043,25 @@ h1 {
       ].map(([label, value]) => `${formatMetricCount(value)} ${label}`).join(" | ");
     }
 
+    function hasTweetMetrics(item) {
+      const metrics = item?.metrics || {};
+      return ["views", "likes", "replies", "reposts"].some((key) => Number(metrics[key] || 0) > 0);
+    }
+
+    function renderTweetMetricChips(item) {
+      const metrics = item?.metrics || {};
+      const chips = [
+        ["Views", metrics.views],
+        ["Likes", metrics.likes],
+        ["Replies", metrics.replies],
+        ["Reposts", metrics.reposts],
+      ].map(([label, value]) => `<span class="timeline-metric">${formatMetricCount(value)} ${label}</span>`);
+      if (!hasTweetMetrics(item) && extractTweetId(item?.sourceHref)) {
+        chips.push(`<span class="timeline-metric">${timelineMetricSyncAttempted ? "Metrics unavailable" : "Metrics syncing"}</span>`);
+      }
+      return chips.join("");
+    }
+
     function extractTweetId(sourceHref) {
       const match = String(sourceHref || "").match(/status\/(\d+)/i);
       return match ? match[1] : "";
@@ -2054,13 +2091,17 @@ h1 {
       const candidates = financeTimelineItems.filter((item) => extractTweetId(item.sourceHref));
       if (!candidates.length) return;
       const results = await Promise.allSettled(candidates.map((item) => fetchTweetMetrics(item.sourceHref)));
+      timelineMetricSyncAttempted = true;
       let changed = false;
       const metricsById = new Map();
       results.forEach((result, index) => {
         if (result.status !== "fulfilled" || !result.value) return;
         metricsById.set(candidates[index].id, result.value);
       });
-      if (!metricsById.size) return;
+      if (!metricsById.size) {
+        renderTrollDeaths();
+        return;
+      }
       const nextItems = financeTimelineItems.map((item) => {
         const nextMetrics = metricsById.get(item.id);
         if (!nextMetrics) return item;
@@ -2070,7 +2111,10 @@ h1 {
         changed = true;
         return { ...item, metrics: nextMetrics };
       });
-      if (!changed) return;
+      if (!changed) {
+        renderTrollDeaths();
+        return;
+      }
       setFinanceTimelineItems(nextItems);
       renderTrollDeaths();
     }
@@ -2901,7 +2945,8 @@ h1 {
               <div class="timeline-tags">${item.tags.map((tag) => `<span class="timeline-tag">${escapeHtml(tag)}</span>`).join("")}</div>
               <h4>${escapeHtml(item.title)}</h4>
               <p>${escapeHtml(item.copy)}</p>
-              <div class="timeline-score">Receipt score: ${getItemScore(item).toLocaleString()} | ${renderTweetMetrics(item)}</div>
+              <div class="timeline-score">Receipt score: ${getItemScore(item).toLocaleString()}</div>
+              <div class="timeline-metrics">${renderTweetMetricChips(item)}</div>
               <a class="timeline-source" href="${escapeHtml(item.sourceHref)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.sourceLabel)}</a>
             </div>
           </article>
