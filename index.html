@@ -686,6 +686,10 @@ h1 {
   align-items: center;
   justify-content: center;
   filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.3));
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
 }
 
 .chart-event-node:hover,
@@ -893,6 +897,26 @@ h1 {
 
 .timeline-filter-btn {
   border-radius: 999px;
+}
+
+.timeline-reset-btn {
+  border: 1px solid rgba(255, 179, 138, 0.32);
+  background: rgba(255, 179, 138, 0.08);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.timeline-reset-btn:hover {
+  background: rgba(255, 179, 138, 0.18);
 }
 
 .timeline-month-bar {
@@ -1321,6 +1345,13 @@ h1 {
   h1 { font-size: 28px; }
   .death-ledger-copy h2 { font-size: 24px; }
   .finance-admin-pass { width: 100%; }
+  .chart-event-node {
+    width: 26px;
+    height: 26px;
+    margin-left: -13px;
+    margin-top: -13px;
+    font-size: 18px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1497,6 +1528,7 @@ h1 {
             <div class="chart-toolbar">
               <div id="chart-toolbar-copy" class="chart-toolbar-copy">Loading CoinGecko market history...</div>
               <div class="chart-range-pills" aria-label="Chart range">
+                <button class="chart-range-btn" type="button" data-range="7">1W</button>
                 <button class="chart-range-btn" type="button" data-range="30">30D</button>
                 <button class="chart-range-btn" type="button" data-range="90">90D</button>
                 <button class="chart-range-btn is-active" type="button" data-range="365">1Y</button>
@@ -1538,6 +1570,12 @@ h1 {
               <button id="timeline-mode-all" class="timeline-mode-btn is-active" type="button">All Receipts</button>
               <button id="timeline-mode-fud" class="timeline-mode-btn" type="button">FUD Mode</button>
               <button id="timeline-mode-guardian" class="timeline-mode-btn" type="button">Guardian Mode</button>
+            </div>
+            <div class="timeline-control-row">
+              <button id="timeline-reset-filters" class="timeline-reset-btn" type="button" aria-label="Reset timeline filters" title="Reset timeline filters">
+                <span aria-hidden="true">&#8635;</span>
+                <span>Reset</span>
+              </button>
             </div>
             <div id="timeline-sort-bar" class="timeline-sort-bar" aria-label="Timeline sort order"></div>
             <div id="timeline-filter-bar" class="timeline-filter-bar" aria-label="Timeline tags"></div>
@@ -1880,7 +1918,7 @@ h1 {
     const DEFAULT_TIMELINE_ITEMS = [];
     let financeTimelineItems = DEFAULT_TIMELINE_ITEMS.map((item) => ({ ...item, tags: Array.isArray(item.tags) ? [...item.tags] : [] }));
     let activeTimelineMode = "all";
-    let activeTimelineTag = "all";
+    let activeTimelineTags = new Set();
     let activeTimelineMonth = "all";
     let activeTimelineSort = "newest";
     let timelineToolsOpen = false;
@@ -2630,8 +2668,8 @@ h1 {
         const targetKind = activeTimelineMode === "guardian" ? "guardian" : "fud";
         items = items.filter((item) => item.kind === targetKind);
       }
-      if (activeTimelineTag !== "all") {
-        items = items.filter((item) => item.tags.includes(activeTimelineTag));
+      if (activeTimelineTags.size) {
+        items = items.filter((item) => item.tags.some((tag) => activeTimelineTags.has(tag)));
       }
       if (activeTimelineMonth !== "all") {
         items = items.filter((item) => getItemDateKey(item) === activeTimelineMonth);
@@ -2693,7 +2731,7 @@ h1 {
         button.style.left = `${left}px`;
         button.style.top = `${top}px`;
         button.setAttribute("aria-label", item.title);
-        button.textContent = item.kind === "guardian" ? "😇" : "💀";
+        button.innerHTML = item.kind === "guardian" ? "&#128519;" : "&#128128;";
         button.addEventListener("click", (event) => {
           event.stopPropagation();
           document.querySelectorAll(".chart-event-node").forEach((node) => node.classList.remove("is-active"));
@@ -2785,7 +2823,13 @@ h1 {
     }
 
     function setTimelineTag(nextTag) {
-      activeTimelineTag = nextTag || "all";
+      if (!nextTag || nextTag === "all") {
+        activeTimelineTags.clear();
+      } else if (activeTimelineTags.has(nextTag)) {
+        activeTimelineTags.delete(nextTag);
+      } else {
+        activeTimelineTags.add(nextTag);
+      }
       renderTrollDeaths();
     }
 
@@ -2797,6 +2841,14 @@ h1 {
     function setTimelineSort(nextSort) {
       activeTimelineSort = nextSort || "newest";
       renderTrollDeaths();
+    }
+
+    function resetTimelineFilters() {
+      activeTimelineMode = "all";
+      activeTimelineTags.clear();
+      activeTimelineMonth = "all";
+      activeTimelineSort = "newest";
+      setTimelineMode("all");
     }
 
     function syncTimelineTools() {
@@ -2819,6 +2871,7 @@ h1 {
       document.getElementById("timeline-mode-all")?.addEventListener("click", () => setTimelineMode("all"));
       document.getElementById("timeline-mode-fud")?.addEventListener("click", () => setTimelineMode("fud"));
       document.getElementById("timeline-mode-guardian")?.addEventListener("click", () => setTimelineMode("guardian"));
+      document.getElementById("timeline-reset-filters")?.addEventListener("click", resetTimelineFilters);
       syncTimelineTools();
     }
 
@@ -2844,10 +2897,10 @@ h1 {
         financeTimelineItems.forEach((item) => item.tags.forEach((tag) => counts.set(tag, (counts.get(tag) || 0) + 1)));
         const topTags = [...counts.entries()]
           .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-        if (activeTimelineTag !== "all" && !counts.has(activeTimelineTag)) activeTimelineTag = "all";
+        activeTimelineTags = new Set([...activeTimelineTags].filter((tag) => counts.has(tag)));
         tagEl.innerHTML = [
-          `<button class="timeline-filter-btn ${activeTimelineTag === "all" ? "is-active" : ""}" type="button" data-tag="all">All Tags</button>`,
-          ...topTags.map(([tag, count]) => `<button class="timeline-filter-btn ${activeTimelineTag === tag ? "is-active" : ""}" type="button" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)} ${count}</button>`)
+          `<button class="timeline-filter-btn ${activeTimelineTags.size === 0 ? "is-active" : ""}" type="button" data-tag="all">All Tags</button>`,
+          ...topTags.map(([tag, count]) => `<button class="timeline-filter-btn ${activeTimelineTags.has(tag) ? "is-active" : ""}" type="button" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)} ${count}</button>`)
         ].join("");
         tagEl.querySelectorAll("[data-tag]").forEach((button) => {
           button.addEventListener("click", () => setTimelineTag(button.dataset.tag));
