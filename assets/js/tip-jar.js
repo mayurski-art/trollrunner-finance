@@ -56,6 +56,12 @@
       for (var i = 0; i < n; i++) placeRestingCoin(i);
     }
 
+    function commitCoin() {           // persist + show one more trollface coin
+      var c = getCount() + 1;
+      setCount(c);
+      if (c <= COIN_CAP) placeRestingCoin(c - 1);
+    }
+
     function dropCoin() {
       glass.classList.remove('is-shook');
       void glass.offsetWidth;            // restart the shake animation
@@ -66,9 +72,7 @@
       glass.appendChild(d);
       d.addEventListener('animationend', function () {
         d.remove();
-        var c = getCount() + 1;
-        setCount(c);
-        if (c <= COIN_CAP) placeRestingCoin(c - 1);
+        commitCoin();
       }, { once: true });
     }
 
@@ -101,6 +105,7 @@
           var payUrl = await window.TrollPay.solanaPayUrl({
             amountUsd: selectedUsd, token: window.TrollPay.getToken(),
           });
+          commitCoin();                    // drop a trollface coin in the jar
           window.location.href = payUrl;   // launches the Phantom app to approve
         } catch (e) {
           statusEl.textContent = '⚠ ' + ((e && e.message) || 'Could not open Phantom');
