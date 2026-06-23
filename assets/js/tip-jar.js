@@ -26,9 +26,16 @@
     if (!sendBtn || !pile || !window.TrollPay) return;
 
     var selectedUsd = 4.20;
-    var tokenLabel = function () { return window.TrollPay.getToken() === 'TROLL' ? '$TROLL' : 'USDC'; };
+    // USDC is 1:1 so we send exactly the amount; $TROLL is a USD-valued tip
+    // converted to tokens at pay time, so we label it "$X in $TROLL".
+    function sendLabel() {
+      if (window.TrollPay.getToken() === 'TROLL') return 'Tip $' + selectedUsd.toFixed(2) + ' in $TROLL';
+      return 'Tip ' + selectedUsd.toFixed(2) + ' USDC';
+    }
 
-    window.TrollPay.mountTokenPicker($('tip-token-picker'));
+    window.TrollPay.mountTokenPicker($('tip-token-picker'), function () {
+      sendBtn.textContent = sendLabel();
+    });
     if (window.TrollPay.config && window.TrollPay.config.DEVNET_MODE && netNote) {
       netNote.textContent = 'Test mode — devnet (fake USDC).';
     }
@@ -70,7 +77,7 @@
 
     function setSelected(usd, fromCustom) {
       selectedUsd = usd;
-      sendBtn.textContent = 'Tip ' + usd.toFixed(2) + ' ' + tokenLabel();
+      sendBtn.textContent = sendLabel();
       amounts.querySelectorAll('.tip-amt').forEach(function (b) {
         b.classList.toggle('is-active', !fromCustom && parseFloat(b.dataset.usd) === usd);
       });
@@ -90,7 +97,7 @@
     sendBtn.addEventListener('click', async function () {
       if (!(selectedUsd > 0)) { statusEl.textContent = 'Enter an amount.'; return; }
       sendBtn.disabled = true;
-      var orig = 'Tip ' + selectedUsd.toFixed(2) + ' ' + tokenLabel();
+      var orig = sendLabel();
       statusEl.textContent = '';
       sendBtn.textContent = 'Connect wallet…';
 
