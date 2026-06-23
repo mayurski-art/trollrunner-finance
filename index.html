@@ -1706,10 +1706,11 @@ h1 {
   <script>
     const TROLL_WALLET = "79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA";
     const TROLL_MINT = "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2";
+    // api.mainnet-beta.solana.com and rpc.ankr.com/solana now return 403 to
+    // browser apps — removed. PublicNode is free, no-key, CORS-enabled, and
+    // returns the balance in ~0.5s. (A stale value is cached as a fallback.)
     const SOLANA_RPC_ENDPOINTS = [
       "https://solana-rpc.publicnode.com",
-      "https://api.mainnet-beta.solana.com",
-      "https://rpc.ankr.com/solana",
     ];
     const MAX_TRANSFER_ITEMS = 12;
     const MAX_SIGNATURE_SCAN = 250;
