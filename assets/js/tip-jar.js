@@ -11,7 +11,6 @@
   var STORE_KEY = 'troll_tip_coins';
 
   function $(id) { return document.getElementById(id); }
-  function coinChar() { return Math.random() < 0.5 ? '$' : 'T'; }
   function getCount() { return parseInt(localStorage.getItem(STORE_KEY) || '0', 10) || 0; }
   function setCount(n) { try { localStorage.setItem(STORE_KEY, String(n)); } catch (e) {} }
 
@@ -47,8 +46,7 @@
       var jitter = Math.random() * 8 - 4;
       c.style.left = (8 + col * 31 + jitter) + 'px';
       c.style.bottom = (8 + row * 13) + 'px';
-      c.style.transform = 'rotate(' + (Math.random() * 60 - 30) + 'deg)';
-      c.textContent = coinChar();
+      c.style.transform = 'rotate(' + (Math.random() * 24 - 12) + 'deg)';
       pile.appendChild(c);
     }
 
@@ -65,7 +63,6 @@
 
       var d = document.createElement('div');
       d.className = 'tip-coin dropping';
-      d.textContent = coinChar();
       glass.appendChild(d);
       d.addEventListener('animationend', function () {
         d.remove();

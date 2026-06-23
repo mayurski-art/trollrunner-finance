@@ -1427,11 +1427,16 @@ h1 {
 .tip-jar-coins { position: absolute; inset: 0; }
 
 .tip-coin {
-  position: absolute; width: 26px; height: 26px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff6c8, #ffd84d 55%, #c9961f);
-  border: 1px solid #a9791a; box-shadow: 0 0 6px rgba(255, 216, 77, 0.5);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 800; color: #7a5a12;
+  position: absolute; width: 28px; height: 28px; border-radius: 50%;
+  background-color: #ffd84d;
+  background-image:
+    radial-gradient(circle at 34% 28%, rgba(255, 250, 220, 0.95), rgba(201, 150, 31, 0) 62%),
+    url('https://media.tenor.com/kkkBm71bkRcAAAAi/trollface-troll-face-terror-png.gif');
+  background-size: 100%, 74%;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  border: 2px solid #c9961f;
+  box-shadow: 0 0 6px rgba(255, 216, 77, 0.5), inset 0 0 4px rgba(0, 0, 0, 0.25);
 }
 .tip-coin.dropping { top: 18px; left: 50%; margin-left: -13px; z-index: 4; animation: tip-drop 0.75s cubic-bezier(.4, 1.2, .6, 1) forwards; }
 @keyframes tip-drop {
@@ -2443,7 +2448,7 @@ h1 {
 
     async function getTrollBalanceFromEndpoint(endpoint) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       let res;
       try {
         res = await fetch(endpoint, {
@@ -2476,18 +2481,22 @@ h1 {
     }
 
     async function getTrollBalance() {
-      try {
-        return await Promise.any(
-          SOLANA_RPC_ENDPOINTS.map((endpoint) =>
-            getTrollBalanceFromEndpoint(endpoint).catch((err) => {
-              console.warn(`Balance fetch failed on ${endpoint}`, err);
-              throw err;
-            })
-          )
-        );
-      } catch (err) {
-        throw new Error("Unable to fetch balance from any Solana RPC endpoint");
+      let lastErr;
+      for (let attempt = 0; attempt < 3; attempt++) {   // retry — public RPC can be flaky
+        try {
+          return await Promise.any(
+            SOLANA_RPC_ENDPOINTS.map((endpoint) =>
+              getTrollBalanceFromEndpoint(endpoint).catch((err) => {
+                console.warn(`Balance fetch failed on ${endpoint}`, err);
+                throw err;
+              })
+            )
+          );
+        } catch (err) {
+          lastErr = err;
+        }
       }
+      throw new Error("Unable to fetch balance from any Solana RPC endpoint");
     }
 
     function readStatsCache() {
@@ -2605,42 +2614,62 @@ h1 {
       return null;
     }
 
+    // Run async `worker` over `items` with at most `limit` in flight at once.
+    async function runWithConcurrency(items, limit, worker) {
+      const queue = items.slice();
+      const runners = [];
+      for (let i = 0; i < Math.min(limit, queue.length); i++) {
+        runners.push((async () => {
+          while (queue.length) await worker(queue.shift());
+        })());
+      }
+      await Promise.all(runners);
+    }
+
     async function getRecentDonations() {
       const atas = await getTreasuryAtas();
-      const rows = [];
+      // 1) Gather recent signatures across both token accounts.
+      const candidates = [];
+      let anySigOk = false;
       for (const token of DONATION_TOKENS) {
         const ata = atas[token.mint];
         if (!ata) continue;
-        let sigs = [];
         try {
-          sigs = (await rpcRequest("getSignaturesForAddress", [ata, { limit: 12 }])) || [];
-        } catch (err) { continue; }
-        for (const s of sigs) {
-          if (!s?.signature) continue;
-          if (donationBySig.has(s.signature)) {           // reuse parsed result
-            const cached = donationBySig.get(s.signature);
-            if (cached) rows.push(cached);
-            continue;
-          }
-          let tx;
-          try {
-            tx = await rpcRequest("getTransaction", [
-              s.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }
-            ]);
-          } catch (err) { continue; }                      // transient — retry next poll
-          if (!tx?.meta || tx.meta.err) { donationBySig.set(s.signature, null); continue; }
-          const delta = incomingDelta(tx.meta, token.mint);
-          if (delta <= 0) { donationBySig.set(s.signature, null); continue; } // tips are incoming only
-          const row = {
-            signature: s.signature,
-            blockTime: s.blockTime || tx.blockTime || null,
-            amount: delta,
-            symbol: token.symbol,
-            donor: findDonor(tx, ata) || "Unknown",
-          };
-          donationBySig.set(s.signature, row);
-          rows.push(row);
-        }
+          const sigs = (await rpcRequest("getSignaturesForAddress", [ata, { limit: 10 }])) || [];
+          anySigOk = true;
+          for (const s of sigs) if (s?.signature) candidates.push({ token, ata, sig: s });
+        } catch (err) { /* try the other token */ }
+      }
+      // If we couldn't even list signatures, signal failure so we don't render
+      // a misleading "no tips yet" over a working feed.
+      if (!anySigOk) throw new Error("Could not list treasury transactions");
+
+      // 2) Fetch only uncached transactions, in parallel (bounded concurrency).
+      const toFetch = candidates.filter((c) => !donationBySig.has(c.sig.signature));
+      await runWithConcurrency(toFetch, 6, async (c) => {
+        let tx;
+        try {
+          tx = await rpcRequest("getTransaction", [
+            c.sig.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }
+          ]);
+        } catch (err) { return; }                          // leave uncached → retry next poll
+        if (!tx?.meta || tx.meta.err) { donationBySig.set(c.sig.signature, null); return; }
+        const delta = incomingDelta(tx.meta, c.token.mint);
+        if (delta <= 0) { donationBySig.set(c.sig.signature, null); return; } // tips are incoming only
+        donationBySig.set(c.sig.signature, {
+          signature: c.sig.signature,
+          blockTime: c.sig.blockTime || tx.blockTime || null,
+          amount: delta,
+          symbol: c.token.symbol,
+          donor: findDonor(tx, c.ata) || "Unknown",
+        });
+      });
+
+      // 3) Assemble the feed from the parse cache.
+      const rows = [];
+      for (const c of candidates) {
+        const row = donationBySig.get(c.sig.signature);
+        if (row) rows.push(row);
       }
       rows.sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0));
       return rows.slice(0, MAX_TRANSFER_ITEMS);
@@ -3142,6 +3171,14 @@ h1 {
       const usdEl = document.getElementById("troll-usd");
       const marketLineEl = document.getElementById("market-line");
 
+      // Show the last known values instantly so the panel never sits on
+      // "Loading..." while the RPC responds (or if it's temporarily down).
+      const cached = readStatsCache();
+      if (cached && typeof cached.balance === "number") {
+        balanceEl.textContent = `${fmtTokenAmount(cached.balance)} TROLL`;
+        if (typeof cached.usdValue === "number") usdEl.textContent = `$${fmtUsd(cached.usdValue)}`;
+      }
+
       const [priceResult, balanceResult] = await Promise.allSettled([
         getTrollPrice(),
         getTrollBalance(),
@@ -3152,6 +3189,8 @@ h1 {
 
       if (hasBalance) {
         balanceEl.textContent = `${fmtTokenAmount(balanceResult.value.amount)} TROLL`;
+      } else if (cached && typeof cached.balance === "number") {
+        balanceEl.textContent = `${fmtTokenAmount(cached.balance)} TROLL`;   // keep last known
       } else {
         balanceEl.textContent = "Unavailable";
       }
@@ -3171,12 +3210,17 @@ h1 {
 
       if (hasPrice) {
         latestTrollUsd = priceResult.value.trollUsd;
-        usdEl.textContent = "Waiting on wallet...";
+        // Fresh price + last-known balance → still show a USD estimate.
+        if (cached && typeof cached.balance === "number") {
+          usdEl.textContent = `$${fmtUsd(cached.balance * priceResult.value.trollUsd)}`;
+        } else {
+          usdEl.textContent = "Waiting on wallet...";
+        }
         marketLineEl.textContent = `${priceResult.value.source} live: $TROLL $${fmtPrice(priceResult.value.trollUsd)} | Wallet RPC unavailable`;
       } else if (hasBalance) {
-        usdEl.textContent = "Waiting on price...";
+        if (!(cached && typeof cached.usdValue === "number")) usdEl.textContent = "Waiting on price...";
         marketLineEl.textContent = `Wallet loaded (${new URL(balanceResult.value.endpoint).hostname}) | CoinGecko unavailable`;
-      } else {
+      } else if (!(cached && typeof cached.balance === "number")) {
         usdEl.textContent = "Unavailable";
         marketLineEl.textContent = "Market and wallet data unavailable.";
       }
@@ -3241,6 +3285,8 @@ h1 {
     });
     // Live donor feed — poll for new tips.
     window.setInterval(loadTransfers, DONATION_POLL_MS);
+    // Keep the fund balance fresh too (updates after tips land, no reload needed).
+    window.setInterval(loadTrollStats, 60000);
 
     refreshFinanceTimelineFromBackend();
     if (isSupabaseConfigured()) {
@@ -3249,8 +3295,8 @@ h1 {
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/js/troll-pay-config.js"></script>
-  <script src="https://trollrunner.net/assets/js/troll-pay.js?v=6"></script>
-  <script src="assets/js/tip-jar.js?v=6"></script>
+  <script src="https://trollrunner.net/assets/js/troll-pay.js?v=7"></script>
+  <script src="assets/js/tip-jar.js?v=7"></script>
   <script src="assets/js/site-lock.js"></script>
   <script src="assets/js/admin-auth.js"></script>
 </body>
