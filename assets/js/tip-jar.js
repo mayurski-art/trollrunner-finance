@@ -93,6 +93,21 @@
 
     sendBtn.addEventListener('click', async function () {
       if (!(selectedUsd > 0)) { statusEl.textContent = 'Enter an amount.'; return; }
+
+      // Phone with no injected wallet → hand off to the Phantom app via Solana Pay.
+      if (window.TrollPay.shouldUseSolanaPay && window.TrollPay.shouldUseSolanaPay()) {
+        statusEl.textContent = 'Opening Phantom…';
+        try {
+          var payUrl = await window.TrollPay.solanaPayUrl({
+            amountUsd: selectedUsd, token: window.TrollPay.getToken(),
+          });
+          window.location.href = payUrl;   // launches the Phantom app to approve
+        } catch (e) {
+          statusEl.textContent = '⚠ ' + ((e && e.message) || 'Could not open Phantom');
+        }
+        return;
+      }
+
       sendBtn.disabled = true;
       var orig = sendLabel();
       statusEl.textContent = '';
