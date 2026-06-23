@@ -1368,6 +1368,112 @@ h1 {
     opacity: 0;
   }
 }
+
+/* ── Tip Jar ─────────────────────────────────────────────────────────────── */
+.tip-jar-section {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px;
+  background: linear-gradient(180deg, rgba(18, 29, 21, 0.8), rgba(7, 11, 8, 0.9));
+}
+.tip-jar-heading { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.tip-jar-heading h2 { margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 0.08em; }
+.tip-jar-heading .blink { color: var(--accent); animation: tip-blink 1.1s steps(2) infinite; }
+@keyframes tip-blink { 50% { opacity: 0; } }
+.tip-jar-sub { margin: 0 0 16px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+
+.tip-jar { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 22px; align-items: center; }
+@media (max-width: 620px) { .tip-jar { grid-template-columns: 1fr; justify-items: center; } }
+
+/* CSS-drawn glass jar */
+.tip-jar-glass { position: relative; width: 150px; height: 184px; margin: 0 auto; animation: tip-bob 4s ease-in-out infinite; }
+@keyframes tip-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.tip-jar-glass.is-shook { animation: tip-shake 0.5s ease; }
+@keyframes tip-shake {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  20% { transform: translateX(-4px) rotate(-2deg); }
+  40% { transform: translateX(4px) rotate(2deg); }
+  60% { transform: translateX(-3px) rotate(-1deg); }
+  80% { transform: translateX(3px) rotate(1deg); }
+}
+.tip-jar-lid {
+  position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+  width: 98px; height: 26px; z-index: 3;
+  border: 2px solid rgba(126, 255, 142, 0.7); border-radius: 8px;
+  background: linear-gradient(180deg, rgba(126, 255, 142, 0.3), rgba(126, 255, 142, 0.08));
+}
+.tip-jar-slot {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 46px; height: 6px; border-radius: 4px; background: #021004;
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.85);
+}
+.tip-jar-body {
+  position: absolute; inset: 26px 0 0 0; overflow: hidden;
+  border: 2px solid rgba(126, 255, 142, 0.55); border-radius: 14px 14px 22px 22px;
+  background: linear-gradient(110deg, rgba(126, 255, 142, 0.16), rgba(126, 255, 142, 0.05) 40%, rgba(126, 255, 142, 0.12));
+  box-shadow: inset 0 0 24px rgba(126, 255, 142, 0.18), 0 0 18px rgba(126, 255, 142, 0.22);
+}
+.tip-jar-shine {
+  position: absolute; top: 14px; left: 14px; width: 20px; height: 120px; border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0));
+  transform: skewX(-8deg); pointer-events: none;
+}
+.tip-jar-label {
+  position: absolute; bottom: 16px; left: 0; right: 0; text-align: center;
+  font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: rgba(126, 255, 142, 0.85); text-shadow: 0 0 6px rgba(126, 255, 142, 0.6);
+}
+.tip-jar-coins { position: absolute; inset: 0; }
+
+.tip-coin {
+  position: absolute; width: 26px; height: 26px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6c8, #ffd84d 55%, #c9961f);
+  border: 1px solid #a9791a; box-shadow: 0 0 6px rgba(255, 216, 77, 0.5);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; color: #7a5a12;
+}
+.tip-coin.dropping { top: 18px; left: 50%; margin-left: -13px; z-index: 4; animation: tip-drop 0.75s cubic-bezier(.4, 1.2, .6, 1) forwards; }
+@keyframes tip-drop {
+  0%   { top: 18px; opacity: 0; transform: rotate(0deg) scale(0.8); }
+  15%  { opacity: 1; }
+  70%  { top: var(--rest-top, 132px); transform: rotate(220deg) scale(1); }
+  85%  { top: calc(var(--rest-top, 132px) - 6px); transform: rotate(248deg); }
+  100% { top: var(--rest-top, 132px); transform: rotate(260deg); }
+}
+
+/* controls */
+.tip-jar-controls { min-width: 0; width: 100%; }
+.tip-amounts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.tip-amt {
+  border: 1px solid var(--line); background: var(--panel-soft); color: var(--text);
+  border-radius: 8px; padding: 9px 14px; font-family: inherit; font-size: 14px; cursor: pointer;
+}
+.tip-amt:hover { background: var(--accent-soft); }
+.tip-amt.is-active { background: var(--accent); color: #04210b; border-color: var(--accent); font-weight: 700; }
+.tip-amt-custom {
+  width: 110px; border: 1px solid var(--line); background: #030603; color: var(--text);
+  border-radius: 8px; padding: 9px 12px; font-family: inherit; font-size: 14px;
+}
+.tip-token-picker { display: flex; gap: 6px; align-items: center; margin: 0 0 12px; }
+.pay-token-static { color: var(--muted); font-size: 12px; }
+.pay-token-btn { border: 1px solid var(--line); background: var(--panel-soft); color: var(--muted); border-radius: 6px; padding: 4px 10px; font-family: inherit; font-size: 12px; cursor: pointer; }
+.pay-token-btn.is-active { color: var(--accent); border-color: var(--accent); }
+.tip-send-btn {
+  display: block; width: 100%; max-width: 320px;
+  border: 1px solid var(--accent); border-radius: 8px; padding: 12px 16px;
+  background: linear-gradient(180deg, rgba(126, 255, 142, 0.22), rgba(126, 255, 142, 0.08));
+  color: var(--text); font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+  text-transform: uppercase; letter-spacing: 0.04em; transition: filter 0.15s;
+}
+.tip-send-btn:hover:not(:disabled) { filter: brightness(1.2); }
+.tip-send-btn:disabled { opacity: 0.6; cursor: default; }
+.tip-status { margin: 10px 0 0; font-size: 13px; min-height: 18px; color: var(--accent); }
+.tip-status a { color: var(--accent); }
+.tip-fine { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+@media (prefers-reduced-motion: reduce) {
+  .tip-jar-glass, .tip-coin.dropping { animation: none !important; }
+}
 </style>
 </head>
 <body class="scanlines">
@@ -1443,6 +1549,36 @@ h1 {
             </div>
           </div>
         </aside>
+      </div>
+    </section>
+
+    <section class="tip-jar-section" aria-labelledby="tip-jar-heading">
+      <div class="tip-jar-heading">
+        <h2 id="tip-jar-heading">Tip Jar</h2>
+        <span class="blink" aria-hidden="true">▮</span>
+      </div>
+      <p class="tip-jar-sub">Feed the Troll Fund. Drop a coin in the jar — every tip goes straight to the treasury wallet on Solana.</p>
+      <div class="tip-jar">
+        <div class="tip-jar-glass" id="tip-jar-glass" aria-hidden="true">
+          <div class="tip-jar-lid"><span class="tip-jar-slot"></span></div>
+          <div class="tip-jar-body">
+            <div class="tip-jar-shine"></div>
+            <div class="tip-jar-coins" id="tip-jar-coins"></div>
+            <div class="tip-jar-label">Troll Fund</div>
+          </div>
+        </div>
+        <div class="tip-jar-controls">
+          <div class="tip-amounts" id="tip-amounts">
+            <button class="tip-amt" data-usd="0.69" type="button">$0.69</button>
+            <button class="tip-amt is-active" data-usd="4.20" type="button">$4.20</button>
+            <button class="tip-amt" data-usd="6.90" type="button">$6.90</button>
+            <input class="tip-amt-custom" id="tip-amt-custom" type="number" min="0.01" step="0.01" placeholder="Custom $" inputmode="decimal" aria-label="Custom tip amount in USD">
+          </div>
+          <span id="tip-token-picker" class="tip-token-picker"></span>
+          <button class="tip-send-btn" id="tip-send-btn" type="button">Tip 4.20 USDC</button>
+          <p class="tip-status" id="tip-status" role="status" aria-live="polite"></p>
+          <p class="tip-fine">Tips go straight to the Troll Fund wallet — you approve the transfer in Phantom. Optional, non-refundable. <span id="tip-net-note"></span></p>
+        </div>
       </div>
     </section>
 
@@ -3082,6 +3218,9 @@ h1 {
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/troll-pay-config.js"></script>
+  <script src="assets/js/troll-pay.js"></script>
+  <script src="assets/js/tip-jar.js"></script>
   <script src="assets/js/site-lock.js"></script>
   <script src="assets/js/admin-auth.js"></script>
 </body>
