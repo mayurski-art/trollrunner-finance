@@ -1584,11 +1584,11 @@ h1 {
 
     <section class="card" style="margin-top: 14px;" aria-labelledby="transfers-heading">
       <div class="transfers-header">
-        <h3 id="transfers-heading">Recent $TROLL Transfers</h3>
-        <span id="transfer-status" class="transfers-note">Loading recent transfers...</span>
+        <h3 id="transfers-heading">Recent Tips</h3>
+        <span id="transfer-status" class="transfers-note">Loading recent tips...</span>
       </div>
       <div id="transfer-list" class="transfer-list">
-        <div class="transfer-item">Loading on-chain transfer history...</div>
+        <div class="transfer-item">Loading on-chain tips…</div>
       </div>
     </section>
 
@@ -1706,6 +1706,13 @@ h1 {
   <script>
     const TROLL_WALLET = "79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA";
     const TROLL_MINT = "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2";
+    const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+    // Tokens accepted as tips, scanned for the live donor feed.
+    const DONATION_TOKENS = [
+      { symbol: "TROLL", mint: TROLL_MINT },
+      { symbol: "USDC", mint: USDC_MINT },
+    ];
+    const DONATION_POLL_MS = 30000;
     // api.mainnet-beta.solana.com and rpc.ankr.com/solana now return 403 to
     // browser apps — removed. PublicNode is free, no-key, CORS-enabled, and
     // returns the balance in ~0.5s. (A stale value is cached as a fallback.)
@@ -2547,105 +2554,123 @@ h1 {
       }
     }
 
-    function findTokenDelta(meta, ownerAddress) {
-      const entries = [];
-      for (const item of meta?.preTokenBalances || []) entries.push({ ...item, phase: "pre" });
-      for (const item of meta?.postTokenBalances || []) entries.push({ ...item, phase: "post" });
-      const byAccount = new Map();
-      for (const item of entries) {
-        if (item?.mint !== TROLL_MINT) continue;
-        if (item?.owner !== ownerAddress) continue;
-        const key = String(item.accountIndex);
-        if (!byAccount.has(key)) byAccount.set(key, { pre: 0, post: 0 });
-        const amount = Number(item?.uiTokenAmount?.uiAmount || 0);
-        byAccount.get(key)[item.phase] = amount;
+    // ── Live donor feed ──────────────────────────────────────────────────────
+    // Scan the treasury's TOKEN accounts (USDC + TROLL ATAs) for incoming
+    // transfers — those are the tips. (The old code scanned the wallet address,
+    // but SPL transfers reference the token account, so it never found anything.)
+    let treasuryAtaByMint = null;       // { mint: ataPubkey }
+    const donationBySig = new Map();    // signature -> donation row | null (parse cache)
+
+    async function getTreasuryAtas() {
+      if (treasuryAtaByMint) return treasuryAtaByMint;
+      const map = {};
+      for (const token of DONATION_TOKENS) {
+        try {
+          const res = await rpcRequest("getTokenAccountsByOwner", [
+            TROLL_WALLET, { mint: token.mint }, { encoding: "jsonParsed" }
+          ]);
+          const ata = res?.value?.[0]?.pubkey;
+          if (ata) map[token.mint] = ata;
+        } catch (err) { /* token account may not exist yet */ }
       }
-      let delta = 0;
-      for (const pair of byAccount.values()) delta += (pair.post - pair.pre);
-      return delta;
+      // Only cache once we've found at least one — lets it retry if RPC was flaky.
+      if (Object.keys(map).length) treasuryAtaByMint = map;
+      return map;
     }
 
-    function findCounterparty(tx, direction) {
+    // Net change of the treasury's balance for `mint` (positive = received).
+    function incomingDelta(meta, mint) {
+      let pre = 0, post = 0, seen = false;
+      for (const b of meta?.preTokenBalances || []) {
+        if (b?.mint === mint && b?.owner === TROLL_WALLET) { pre += Number(b?.uiTokenAmount?.uiAmount || 0); seen = true; }
+      }
+      for (const b of meta?.postTokenBalances || []) {
+        if (b?.mint === mint && b?.owner === TROLL_WALLET) { post += Number(b?.uiTokenAmount?.uiAmount || 0); seen = true; }
+      }
+      return seen ? (post - pre) : 0;
+    }
+
+    // The donor wallet = the signer/authority of the transfer into our ATA.
+    function findDonor(tx, destAta) {
       const instructions = [
         ...(tx?.transaction?.message?.instructions || []),
-        ...((tx?.meta?.innerInstructions || []).flatMap((group) => group.instructions || [])),
+        ...((tx?.meta?.innerInstructions || []).flatMap((g) => g.instructions || [])),
       ];
-      for (const instruction of instructions) {
-        const parsed = instruction?.parsed;
-        const type = parsed?.type;
-        const info = parsed?.info || {};
-        if (!parsed || (type !== "transfer" && type !== "transferChecked")) continue;
-        const source = info.source;
-        const destination = info.destination;
-        if (direction === "in" && destination === TROLL_WALLET) return source;
-        if (direction === "out" && source === TROLL_WALLET) return destination;
+      for (const ix of instructions) {
+        const parsed = ix?.parsed;
+        if (!parsed || (parsed.type !== "transfer" && parsed.type !== "transferChecked")) continue;
+        const info = parsed.info || {};
+        if (info.destination === destAta) return info.authority || info.source || null;
       }
       return null;
     }
 
-    async function getRecentTrollTransfers() {
-      const signatures = [];
-      let before = null;
-      while (signatures.length < MAX_SIGNATURE_SCAN) {
-        const batch = await rpcRequest("getSignaturesForAddress", [
-          TROLL_WALLET,
-          { limit: 50, ...(before ? { before } : {}) }
-        ]);
-        if (!batch.length) break;
-        signatures.push(...batch);
-        before = batch[batch.length - 1].signature;
-        if (batch.length < 50) break;
+    async function getRecentDonations() {
+      const atas = await getTreasuryAtas();
+      const rows = [];
+      for (const token of DONATION_TOKENS) {
+        const ata = atas[token.mint];
+        if (!ata) continue;
+        let sigs = [];
+        try {
+          sigs = (await rpcRequest("getSignaturesForAddress", [ata, { limit: 12 }])) || [];
+        } catch (err) { continue; }
+        for (const s of sigs) {
+          if (!s?.signature) continue;
+          if (donationBySig.has(s.signature)) {           // reuse parsed result
+            const cached = donationBySig.get(s.signature);
+            if (cached) rows.push(cached);
+            continue;
+          }
+          let tx;
+          try {
+            tx = await rpcRequest("getTransaction", [
+              s.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }
+            ]);
+          } catch (err) { continue; }                      // transient — retry next poll
+          if (!tx?.meta || tx.meta.err) { donationBySig.set(s.signature, null); continue; }
+          const delta = incomingDelta(tx.meta, token.mint);
+          if (delta <= 0) { donationBySig.set(s.signature, null); continue; } // tips are incoming only
+          const row = {
+            signature: s.signature,
+            blockTime: s.blockTime || tx.blockTime || null,
+            amount: delta,
+            symbol: token.symbol,
+            donor: findDonor(tx, ata) || "Unknown",
+          };
+          donationBySig.set(s.signature, row);
+          rows.push(row);
+        }
       }
-      const transferRows = [];
-      for (const item of signatures) {
-        if (!item?.signature) continue;
-        const tx = await rpcRequest("getTransaction", [
-          item.signature,
-          { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }
-        ]);
-        if (!tx?.meta || tx.meta.err) continue;
-        const delta = findTokenDelta(tx.meta, TROLL_WALLET);
-        if (!delta) continue;
-        const direction = delta > 0 ? "in" : "out";
-        const absoluteAmount = Math.abs(delta);
-        const counterparty = findCounterparty(tx, direction);
-        const name = await resolveSolName(counterparty);
-        transferRows.push({
-          signature: item.signature,
-          blockTime: item.blockTime || tx.blockTime || null,
-          direction,
-          amount: absoluteAmount,
-          counterparty: counterparty || "Unknown",
-          displayCounterparty: name || counterparty || "Unknown",
-        });
-        if (transferRows.length >= MAX_TRANSFER_ITEMS) break;
-      }
-
-      return transferRows.sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0));
+      rows.sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0));
+      return rows.slice(0, MAX_TRANSFER_ITEMS);
     }
 
-    function renderTransfers(transfers) {
-      const transferListEl = document.getElementById("transfer-list");
-      const transferStatusEl = document.getElementById("transfer-status");
-      if (!transfers.length) {
-        transferStatusEl.textContent = "No recent $TROLL transfers found.";
-        transferListEl.innerHTML = "<div class='transfer-item'>No $TROLL movements were detected in the recent transactions.</div>";
+    function donationUsd(row) {
+      if (row.symbol === "USDC") return row.amount;                          // ~1:1
+      if (row.symbol === "TROLL" && latestTrollUsd) return row.amount * latestTrollUsd;
+      return null;
+    }
+
+    function renderTransfers(rows) {
+      const listEl = document.getElementById("transfer-list");
+      const statusEl = document.getElementById("transfer-status");
+      if (!rows.length) {
+        statusEl.textContent = "No tips yet — be the first to drop a coin in the jar.";
+        listEl.innerHTML = "<div class='transfer-item'>No tips detected on-chain yet.</div>";
         return;
       }
-
-      transferStatusEl.textContent = `Showing ${transfers.length} most recent transfers (newest first)`;
-      transferListEl.innerHTML = transfers.map((tx) => {
-        const date = tx.blockTime ? new Date(tx.blockTime * 1000).toLocaleString() : "Unknown date";
-        const usdValue = latestTrollUsd ? tx.amount * latestTrollUsd : null;
-        const directionClass = tx.direction === "in" ? "transfer-in" : "transfer-out";
-        const directionLabel = tx.direction === "in" ? "Incoming to Fund Wallet" : "Outgoing from Fund Wallet";
-        const actorLabel = tx.direction === "in" ? "From" : "To";
+      statusEl.textContent = `${rows.length} most recent · live · updated ${new Date().toLocaleTimeString()}`;
+      listEl.innerHTML = rows.map((row) => {
+        const date = row.blockTime ? new Date(row.blockTime * 1000).toLocaleString() : "Unknown date";
+        const usd = donationUsd(row);
+        const usdLabel = usd === null ? "" : ` (~$${fmtUsd(usd)})`;
         return `
           <article class="transfer-item">
-            <div class="transfer-direction ${directionClass}">${directionLabel}</div>
-            <div class="transfer-title">${actorLabel}: <strong>${tx.displayCounterparty}</strong> <span class="transfers-note">(${shortenAddress(tx.counterparty)})</span></div>
-            <div class="transfer-amount">${fmtTokenAmount(tx.amount)} TROLL ${usdValue === null ? "(USD pending)" : `(~$${fmtUsd(usdValue)} at current price)`}</div>
-            <div class="transfer-meta">Date: ${date}<br>Signature: <a href="https://solscan.io/tx/${tx.signature}" target="_blank" rel="noopener noreferrer">${shortenAddress(tx.signature)}</a></div>
+            <div class="transfer-direction transfer-in">🪙 New tip</div>
+            <div class="transfer-title">From: <strong>${shortenAddress(row.donor)}</strong></div>
+            <div class="transfer-amount">${fmtTokenAmount(row.amount)} ${row.symbol}${usdLabel}</div>
+            <div class="transfer-meta">Date: ${date}<br>Signature: <a href="https://solscan.io/tx/${row.signature}" target="_blank" rel="noopener noreferrer">${shortenAddress(row.signature)}</a></div>
           </article>
         `;
       }).join("");
@@ -3096,17 +3121,19 @@ h1 {
 
     }
 
+    let donationsRendered = false;
     async function loadTransfers() {
       const transferStatusEl = document.getElementById("transfer-status");
       try {
-        if (!cachedTransfers.length) {
-          cachedTransfers = await getRecentTrollTransfers();
-        }
+        cachedTransfers = await getRecentDonations();
         renderTransfers(cachedTransfers);
+        donationsRendered = true;
       } catch (err) {
-        console.error("Unable to load transfer feed", err);
-        transferStatusEl.textContent = "Transfer feed unavailable right now.";
-        document.getElementById("transfer-list").innerHTML = "<div class='transfer-item'>Could not fetch recent transfers from Solana RPC.</div>";
+        console.error("Unable to load donor feed", err);
+        if (!donationsRendered) {
+          transferStatusEl.textContent = "Tip feed unavailable right now.";
+          document.getElementById("transfer-list").innerHTML = "<div class='transfer-item'>Could not fetch recent tips from Solana RPC.</div>";
+        }
       }
     }
 
@@ -3212,6 +3239,8 @@ h1 {
       // If price resolved after transfers rendered, refresh USD estimations.
       if (latestTrollUsd) loadTransfers();
     });
+    // Live donor feed — poll for new tips.
+    window.setInterval(loadTransfers, DONATION_POLL_MS);
 
     refreshFinanceTimelineFromBackend();
     if (isSupabaseConfigured()) {
