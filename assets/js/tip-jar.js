@@ -102,6 +102,7 @@
       if (!(selectedUsd > 0)) { statusEl.textContent = 'Enter an amount.'; return; }
 
       // Phone with no injected wallet → hand off to the Phantom app via Solana Pay.
+      // Don't commit the coin until the user returns; the transaction log will catch it.
       if (window.TrollPay.shouldUseSolanaPay && window.TrollPay.shouldUseSolanaPay()) {
         statusEl.textContent = 'Opening Phantom…';
         try {
@@ -109,7 +110,6 @@
             amountUsd: selectedUsd, token: window.TrollPay.getToken(),
             label: 'Troll Fund tip', message: 'Tip the Troll Runner', memo: TIP_MEMO,
           });
-          commitCoin();                    // drop a trollface coin in the jar
           window.location.href = payUrl;   // launches the Phantom app to approve
         } catch (e) {
           statusEl.textContent = '⚠ ' + ((e && e.message) || 'Could not open Phantom');
