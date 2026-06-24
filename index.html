@@ -1788,11 +1788,13 @@ h1 {
       { symbol: "USDC", mint: USDC_MINT },
     ];
     const DONATION_POLL_MS = 12000;   // ≤30s freshness; new txns show within ~12s
-    // api.mainnet-beta.solana.com and rpc.ankr.com/solana now return 403 to
-    // browser apps — removed. PublicNode is free, no-key, CORS-enabled, and
-    // returns the balance in ~0.5s. (A stale value is cached as a fallback.)
+    // Multiple free, CORS-enabled, no-key RPCs for resilience. PublicNode is fast
+    // and rate-limit-free (good for the many transaction-log calls) but goes down
+    // intermittently; the Solana Foundation RPC is a solid fallback. Balance
+    // fetches race them with Promise.any; the txn log tries them in order.
     const SOLANA_RPC_ENDPOINTS = [
       "https://solana-rpc.publicnode.com",
+      "https://api.mainnet-beta.solana.com",
     ];
     const MAX_TRANSFER_ITEMS = 12;
     const MAX_SIGNATURE_SCAN = 250;
@@ -3525,7 +3527,7 @@ h1 {
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/js/troll-pay-config.js"></script>
   <script src="https://trollrunner.net/assets/js/troll-pay.js?v=13"></script>
-  <script src="assets/js/tip-jar.js?v=10"></script>
+  <script src="assets/js/tip-jar.js?v=14"></script>
   <script src="assets/js/site-lock.js"></script>
   <script src="assets/js/admin-auth.js"></script>
 </body>
