@@ -9,6 +9,9 @@
 
   var COIN_CAP  = 24;            // max coins drawn in the jar
   var STORE_KEY = 'troll_tip_coins';
+  // On-chain memo tag → the transaction log categorizes this as a tip.
+  // Format: TR|<category>|<label>
+  var TIP_MEMO  = 'TR|tip|Tip';
 
   function $(id) { return document.getElementById(id); }
   function getCount() { return parseInt(localStorage.getItem(STORE_KEY) || '0', 10) || 0; }
@@ -104,6 +107,7 @@
         try {
           var payUrl = await window.TrollPay.solanaPayUrl({
             amountUsd: selectedUsd, token: window.TrollPay.getToken(),
+            label: 'Troll Fund tip', message: 'Tip the Troll Runner', memo: TIP_MEMO,
           });
           commitCoin();                    // drop a trollface coin in the jar
           window.location.href = payUrl;   // launches the Phantom app to approve
@@ -122,6 +126,7 @@
         amountUsd: selectedUsd,
         token: window.TrollPay.getToken(),
         taxRate: 0,                       // tips are straight donations, no tax
+        memo: TIP_MEMO,                   // on-chain tag → categorized as a tip
         onProgress: function (ev) {
           if (ev.stage === 'connecting')      sendBtn.textContent = 'Connect wallet…';
           else if (ev.stage === 'building')   sendBtn.textContent = 'Building tx…';

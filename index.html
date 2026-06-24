@@ -1123,6 +1123,67 @@ h1 {
   text-decoration: underline;
 }
 
+/* Transaction-log category tag + filters */
+.transfer-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.txn-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.txn-tag.is-tip {
+  color: #8cff9a;
+  background: rgba(126, 255, 142, 0.1);
+  border-color: rgba(126, 255, 142, 0.35);
+}
+
+.txn-tag.is-game {
+  color: #b9a0ff;
+  background: rgba(150, 120, 255, 0.12);
+  border-color: rgba(150, 120, 255, 0.4);
+}
+
+.transfer-filters {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.txn-filter {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.txn-filter:hover { color: var(--text); }
+
+.txn-filter.is-active {
+  color: #06120a;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 .donation {
   margin-top: 14px;
   padding: 14px;
@@ -1589,11 +1650,16 @@ h1 {
 
     <section class="card" style="margin-top: 14px;" aria-labelledby="transfers-heading">
       <div class="transfers-header">
-        <h3 id="transfers-heading">Recent Tips</h3>
-        <span id="transfer-status" class="transfers-note">Loading recent tips...</span>
+        <h3 id="transfers-heading">Transaction Logs</h3>
+        <span id="transfer-status" class="transfers-note">Loading transactions…</span>
+      </div>
+      <div class="transfer-filters" role="group" aria-label="Filter transactions">
+        <button type="button" class="txn-filter is-active" data-filter="all">All</button>
+        <button type="button" class="txn-filter" data-filter="tip">Tips</button>
+        <button type="button" class="txn-filter" data-filter="game">Games</button>
       </div>
       <div id="transfer-list" class="transfer-list">
-        <div class="transfer-item">Loading on-chain tips…</div>
+        <div class="transfer-item">Loading on-chain transactions…</div>
       </div>
     </section>
 
@@ -1717,7 +1783,7 @@ h1 {
       { symbol: "TROLL", mint: TROLL_MINT },
       { symbol: "USDC", mint: USDC_MINT },
     ];
-    const DONATION_POLL_MS = 30000;
+    const DONATION_POLL_MS = 12000;   // ≤30s freshness; new txns show within ~12s
     // api.mainnet-beta.solana.com and rpc.ankr.com/solana now return 403 to
     // browser apps — removed. PublicNode is free, no-key, CORS-enabled, and
     // returns the balance in ~0.5s. (A stale value is cached as a fallback.)
@@ -1726,6 +1792,7 @@ h1 {
     ];
     const MAX_TRANSFER_ITEMS = 12;
     const MAX_SIGNATURE_SCAN = 250;
+    const MEMO_PROGRAM_ID = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr";
     const BALANCE_CACHE_KEY = "troll_stats_cache_v1";
     const CACHE_TTL_MS = 2 * 60 * 1000;
     const STALE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -2599,6 +2666,37 @@ h1 {
       return seen ? (post - pre) : 0;
     }
 
+    // On-chain SPL memo (if any) → used to categorize the payment. Our memos use
+    // the format "TR|<category>|<label>", e.g. "TR|game|Troll Dash revive".
+    function extractMemo(tx) {
+      const ixs = [
+        ...(tx?.transaction?.message?.instructions || []),
+        ...((tx?.meta?.innerInstructions || []).flatMap((g) => g.instructions || [])),
+      ];
+      for (const ix of ixs) {
+        if (ix?.program === "spl-memo" && typeof ix.parsed === "string") return ix.parsed;
+        if (ix?.programId === MEMO_PROGRAM_ID && typeof ix.parsed === "string") return ix.parsed;
+      }
+      // Fallback: parse the program log, e.g. Program log: Memo (len 7): "TR|tip|Tip"
+      for (const log of tx?.meta?.logMessages || []) {
+        const m = log.match(/Memo \(len \d+\): "(.*)"/);
+        if (m) return m[1];
+      }
+      return null;
+    }
+
+    // Derive { category: "tip"|"game", tag } from a memo. Untagged payments
+    // (older txns, or direct transfers) default to "tip".
+    function categorize(memo) {
+      if (memo && memo.indexOf("TR|") === 0) {
+        const parts = memo.split("|");
+        const cat = parts[1] === "game" ? "game" : "tip";
+        const label = parts[2] || (cat === "game" ? "Game" : "Tip");
+        return { category: cat, tag: label };
+      }
+      return { category: "tip", tag: "Tip" };
+    }
+
     // The donor wallet = the signer/authority of the transfer into our ATA.
     function findDonor(tx, destAta) {
       const instructions = [
@@ -2655,13 +2753,16 @@ h1 {
         } catch (err) { return; }                          // leave uncached → retry next poll
         if (!tx?.meta || tx.meta.err) { donationBySig.set(c.sig.signature, null); return; }
         const delta = incomingDelta(tx.meta, c.token.mint);
-        if (delta <= 0) { donationBySig.set(c.sig.signature, null); return; } // tips are incoming only
+        if (delta <= 0) { donationBySig.set(c.sig.signature, null); return; } // incoming only
+        const cat = categorize(extractMemo(tx));
         donationBySig.set(c.sig.signature, {
           signature: c.sig.signature,
           blockTime: c.sig.blockTime || tx.blockTime || null,
           amount: delta,
           symbol: c.token.symbol,
           donor: findDonor(tx, c.ata) || "Unknown",
+          category: cat.category,
+          tag: cat.tag,
         });
       });
 
@@ -2681,23 +2782,46 @@ h1 {
       return null;
     }
 
+    let transferFilter = "all";   // all | tip | game
+
     function renderTransfers(rows) {
       const listEl = document.getElementById("transfer-list");
       const statusEl = document.getElementById("transfer-status");
       if (!rows.length) {
-        statusEl.textContent = "No tips yet — be the first to drop a coin in the jar.";
-        listEl.innerHTML = "<div class='transfer-item'>No tips detected on-chain yet.</div>";
+        statusEl.textContent = "No transactions yet — be the first to drop a coin in the jar.";
+        listEl.innerHTML = "<div class='transfer-item'>No transactions detected on-chain yet.</div>";
         return;
       }
-      statusEl.textContent = `${rows.length} most recent · live · updated ${new Date().toLocaleTimeString()}`;
-      listEl.innerHTML = rows.map((row) => {
+      const tipCount = rows.filter((r) => r.category !== "game").length;
+      const gameCount = rows.length - tipCount;
+      statusEl.textContent =
+        `${rows.length} most recent · ${tipCount} tips · ${gameCount} games · updated ${new Date().toLocaleTimeString()}`;
+
+      const visible = rows.filter((row) =>
+        transferFilter === "all" ? true
+        : transferFilter === "game" ? row.category === "game"
+        : row.category !== "game");
+
+      if (!visible.length) {
+        listEl.innerHTML = `<div class='transfer-item'>No ${transferFilter === "game" ? "game" : "tip"} transactions yet.</div>`;
+        return;
+      }
+
+      listEl.innerHTML = visible.map((row) => {
         const date = row.blockTime ? new Date(row.blockTime * 1000).toLocaleString() : "Unknown date";
         const usd = donationUsd(row);
         const usdLabel = usd === null ? "" : ` (~$${fmtUsd(usd)})`;
+        const isGame = row.category === "game";
+        const tagClass = isGame ? "is-game" : "is-tip";
+        const tagText = isGame ? `🎮 ${row.tag || "Game"}` : `🪙 ${row.tag || "Tip"}`;
+        const title = isGame ? "Player" : "From";
         return `
           <article class="transfer-item">
-            <div class="transfer-direction transfer-in">🪙 New tip</div>
-            <div class="transfer-title">From: <strong>${shortenAddress(row.donor)}</strong></div>
+            <div class="transfer-row-top">
+              <div class="transfer-direction transfer-in">${isGame ? "🎮 Game spend" : "🪙 Tip"}</div>
+              <span class="txn-tag ${tagClass}">${tagText}</span>
+            </div>
+            <div class="transfer-title">${title}: <strong>${shortenAddress(row.donor)}</strong></div>
             <div class="transfer-amount">${fmtTokenAmount(row.amount)} ${row.symbol}${usdLabel}</div>
             <div class="transfer-meta">Date: ${date}<br>Signature: <a href="https://solscan.io/tx/${row.signature}" target="_blank" rel="noopener noreferrer">${shortenAddress(row.signature)}</a></div>
           </article>
@@ -3158,10 +3282,10 @@ h1 {
         renderTransfers(cachedTransfers);
         donationsRendered = true;
       } catch (err) {
-        console.error("Unable to load donor feed", err);
+        console.error("Unable to load transaction log", err);
         if (!donationsRendered) {
-          transferStatusEl.textContent = "Tip feed unavailable right now.";
-          document.getElementById("transfer-list").innerHTML = "<div class='transfer-item'>Could not fetch recent tips from Solana RPC.</div>";
+          transferStatusEl.textContent = "Transaction log unavailable right now.";
+          document.getElementById("transfer-list").innerHTML = "<div class='transfer-item'>Could not fetch transactions from Solana RPC.</div>";
         }
       }
     }
@@ -3283,8 +3407,21 @@ h1 {
       // If price resolved after transfers rendered, refresh USD estimations.
       if (latestTrollUsd) loadTransfers();
     });
-    // Live donor feed — poll for new tips.
+    // Transaction-log category filter buttons.
+    document.querySelectorAll(".txn-filter").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        transferFilter = btn.dataset.filter || "all";
+        document.querySelectorAll(".txn-filter").forEach((b) =>
+          b.classList.toggle("is-active", b === btn));
+        renderTransfers(cachedTransfers);
+      });
+    });
+
+    // Live transaction log — poll frequently for near-instant updates.
     window.setInterval(loadTransfers, DONATION_POLL_MS);
+    // Refresh the moment the tab regains focus (so returning shows the latest).
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) loadTransfers(); });
+    window.addEventListener("focus", loadTransfers);
     // Keep the fund balance fresh too (updates after tips land, no reload needed).
     window.setInterval(loadTrollStats, 60000);
 
@@ -3295,8 +3432,8 @@ h1 {
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/js/troll-pay-config.js"></script>
-  <script src="https://trollrunner.net/assets/js/troll-pay.js?v=12"></script>
-  <script src="assets/js/tip-jar.js?v=9"></script>
+  <script src="https://trollrunner.net/assets/js/troll-pay.js?v=13"></script>
+  <script src="assets/js/tip-jar.js?v=10"></script>
   <script src="assets/js/site-lock.js"></script>
   <script src="assets/js/admin-auth.js"></script>
 </body>
