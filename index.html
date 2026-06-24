@@ -2686,13 +2686,18 @@ h1 {
     }
 
     // Derive { category: "tip"|"game", tag } from a memo. Untagged payments
-    // (older txns, or direct transfers) default to "tip".
-    function categorize(memo) {
+    // (older txns, or direct transfers) are inferred: revive price is ~$0.74,
+    // so amount ≈ $0.70–0.80 is likely a game payment.
+    function categorize(memo, usdAmount) {
       if (memo && memo.indexOf("TR|") === 0) {
         const parts = memo.split("|");
         const cat = parts[1] === "game" ? "game" : "tip";
         const label = parts[2] || (cat === "game" ? "Game" : "Tip");
         return { category: cat, tag: label };
+      }
+      // Heuristic: if no memo and amount ≈ revive price ($0.74), treat as game.
+      if (usdAmount !== null && usdAmount >= 0.70 && usdAmount <= 0.80) {
+        return { category: "game", tag: "Game" };
       }
       return { category: "tip", tag: "Tip" };
     }
@@ -2754,7 +2759,9 @@ h1 {
         if (!tx?.meta || tx.meta.err) { donationBySig.set(c.sig.signature, null); return; }
         const delta = incomingDelta(tx.meta, c.token.mint);
         if (delta <= 0) { donationBySig.set(c.sig.signature, null); return; } // incoming only
-        const cat = categorize(extractMemo(tx));
+        const mockRow = { amount: delta, symbol: c.token.symbol };
+        const usd = donationUsd(mockRow);
+        const cat = categorize(extractMemo(tx), usd);
         donationBySig.set(c.sig.signature, {
           signature: c.sig.signature,
           blockTime: c.sig.blockTime || tx.blockTime || null,
