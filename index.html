@@ -1566,6 +1566,10 @@ h1 {
               <div id="troll-balance" class="value">Loading...</div>
             </article>
             <article class="stat">
+              <div class="label">USDC Balance</div>
+              <div id="usdc-balance" class="value">Loading...</div>
+            </article>
+            <article class="stat">
               <div class="label">USD Value</div>
               <div id="troll-usd" class="value">Loading...</div>
             </article>
@@ -2566,6 +2570,59 @@ h1 {
       throw new Error("Unable to fetch balance from any Solana RPC endpoint");
     }
 
+    async function getUsdcBalanceFromEndpoint(endpoint) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      let res;
+      try {
+        res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "getTokenAccountsByOwner",
+            params: [
+              TROLL_WALLET,
+              { mint: USDC_MINT },
+              { encoding: "jsonParsed" }
+            ]
+          }),
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
+      const json = await res.json();
+      if (json?.error) throw new Error(`${endpoint} RPC error: ${json.error.message || "unknown"}`);
+      const accounts = json?.result?.value || [];
+      const amount = accounts.reduce((sum, account) => {
+        const tokenAmount = Number(account?.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
+        return sum + tokenAmount;
+      }, 0);
+      return { amount, endpoint };
+    }
+
+    async function getUsdcBalance() {
+      let lastErr;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          return await Promise.any(
+            SOLANA_RPC_ENDPOINTS.map((endpoint) =>
+              getUsdcBalanceFromEndpoint(endpoint).catch((err) => {
+                console.warn(`USDC balance fetch failed on ${endpoint}`, err);
+                throw err;
+              })
+            )
+          );
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+      throw new Error("Unable to fetch USDC balance from any Solana RPC endpoint");
+    }
+
     function readStatsCache() {
       try {
         const raw = localStorage.getItem(BALANCE_CACHE_KEY);
@@ -2597,9 +2654,11 @@ h1 {
       if (!Number.isFinite(cacheAgeMs) || cacheAgeMs > STALE_CACHE_MAX_AGE_MS) return false;
 
       const balanceEl = document.getElementById("troll-balance");
+      const usdcEl = document.getElementById("usdc-balance");
       const usdEl = document.getElementById("troll-usd");
       const marketLineEl = document.getElementById("market-line");
       balanceEl.textContent = `${fmtTokenAmount(cached.balance)} TROLL`;
+      if (usdcEl) usdcEl.textContent = `${fmtTokenAmount(cached.usdcBalance || 0)} USDC`;
       usdEl.textContent = `$${fmtUsd(cached.usdValue)}`;
 
       if (cacheAgeMs <= CACHE_TTL_MS) {
@@ -3299,6 +3358,7 @@ h1 {
 
     async function loadTrollStats() {
       const balanceEl = document.getElementById("troll-balance");
+      const usdcEl = document.getElementById("usdc-balance");
       const usdEl = document.getElementById("troll-usd");
       const marketLineEl = document.getElementById("market-line");
 
@@ -3307,16 +3367,19 @@ h1 {
       const cached = readStatsCache();
       if (cached && typeof cached.balance === "number") {
         balanceEl.textContent = `${fmtTokenAmount(cached.balance)} TROLL`;
+        if (usdcEl) usdcEl.textContent = `${fmtTokenAmount(cached.usdcBalance || 0)} USDC`;
         if (typeof cached.usdValue === "number") usdEl.textContent = `$${fmtUsd(cached.usdValue)}`;
       }
 
-      const [priceResult, balanceResult] = await Promise.allSettled([
+      const [priceResult, balanceResult, usdcResult] = await Promise.allSettled([
         getTrollPrice(),
         getTrollBalance(),
+        getUsdcBalance(),
       ]);
 
       const hasPrice = priceResult.status === "fulfilled";
       const hasBalance = balanceResult.status === "fulfilled";
+      const hasUsdc = usdcResult.status === "fulfilled";
 
       if (hasBalance) {
         balanceEl.textContent = `${fmtTokenAmount(balanceResult.value.amount)} TROLL`;
@@ -3326,6 +3389,14 @@ h1 {
         balanceEl.textContent = "Unavailable";
       }
 
+      if (hasUsdc) {
+        if (usdcEl) usdcEl.textContent = `${fmtTokenAmount(usdcResult.value.amount)} USDC`;
+      } else if (cached && typeof cached.usdcBalance === "number") {
+        if (usdcEl) usdcEl.textContent = `${fmtTokenAmount(cached.usdcBalance)} USDC`;
+      } else {
+        if (usdcEl) usdcEl.textContent = "Unavailable";
+      }
+
       if (hasPrice && hasBalance) {
         latestTrollUsd = priceResult.value.trollUsd;
         const usdValue = balanceResult.value.amount * priceResult.value.trollUsd;
@@ -3333,6 +3404,7 @@ h1 {
         marketLineEl.textContent = `${priceResult.value.source} live: $TROLL $${fmtPrice(priceResult.value.trollUsd)} | Wallet via ${new URL(balanceResult.value.endpoint).hostname}`;
         writeStatsCache({
           balance: balanceResult.value.amount,
+          usdcBalance: hasUsdc ? usdcResult.value.amount : (cached?.usdcBalance || 0),
           usdValue,
           price: priceResult.value.trollUsd,
         });
@@ -3358,6 +3430,7 @@ h1 {
 
       if (priceResult.status === "rejected") console.error("Unable to load $TROLL price", priceResult.reason);
       if (balanceResult.status === "rejected") console.error("Unable to load $TROLL wallet balance", balanceResult.reason);
+      if (usdcResult.status === "rejected") console.error("Unable to load USDC wallet balance", usdcResult.reason);
     }
 
     function setupWalletCopyButton() {
