@@ -2597,10 +2597,15 @@ h1 {
       const json = await res.json();
       if (json?.error) throw new Error(`${endpoint} RPC error: ${json.error.message || "unknown"}`);
       const accounts = json?.result?.value || [];
+      if (!Array.isArray(accounts)) {
+        console.warn(`USDC: unexpected response from ${endpoint}:`, json.result);
+        throw new Error(`${endpoint} returned unexpected format`);
+      }
       const amount = accounts.reduce((sum, account) => {
         const tokenAmount = Number(account?.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
         return sum + tokenAmount;
       }, 0);
+      console.log(`USDC balance from ${endpoint}:`, amount, `(${accounts.length} accounts)`);
       return { amount, endpoint };
     }
 
@@ -3428,9 +3433,16 @@ h1 {
         marketLineEl.textContent = "Market and wallet data unavailable.";
       }
 
-      if (priceResult.status === "rejected") console.error("Unable to load $TROLL price", priceResult.reason);
-      if (balanceResult.status === "rejected") console.error("Unable to load $TROLL wallet balance", balanceResult.reason);
-      if (usdcResult.status === "rejected") console.error("Unable to load USDC wallet balance", usdcResult.reason);
+      if (priceResult.status === "rejected") {
+        console.error("Unable to load $TROLL price", priceResult.reason);
+      }
+      if (balanceResult.status === "rejected") {
+        console.error("Unable to load $TROLL wallet balance", balanceResult.reason);
+      }
+      if (usdcResult.status === "rejected") {
+        console.error("Unable to load USDC wallet balance", usdcResult.reason);
+        if (usdcEl) usdcEl.textContent = "Error fetching";
+      }
     }
 
     function setupWalletCopyButton() {
