@@ -14,8 +14,15 @@
   var TIP_MEMO  = 'TR|tip|Tip';
 
   function $(id) { return document.getElementById(id); }
-  function getCount() { return parseInt(localStorage.getItem(STORE_KEY) || '0', 10) || 0; }
-  function setCount(n) { try { localStorage.setItem(STORE_KEY, String(n)); } catch (e) {} }
+  function getCount() {
+    var n = parseInt(localStorage.getItem(STORE_KEY) || '0', 10) || 0;
+    console.log('[tip-jar] getCount from localStorage:', STORE_KEY, '→', n);
+    return n;
+  }
+  function setCount(n) {
+    console.log('[tip-jar] setCount to localStorage:', STORE_KEY, '→', n);
+    try { localStorage.setItem(STORE_KEY, String(n)); } catch (e) { console.error('[tip-jar] localStorage error:', e); }
+  }
 
   function init() {
     var glass   = $('tip-jar-glass');
@@ -56,6 +63,7 @@
     function renderPile() {
       pile.innerHTML = '';
       var n = Math.min(getCount(), COIN_CAP);
+      console.log('[tip-jar] renderPile: drawing', n, 'coins');
       for (var i = 0; i < n; i++) placeRestingCoin(i);
     }
 
