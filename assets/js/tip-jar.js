@@ -2,27 +2,20 @@
  * Tip Jar — nostalgic animated donate widget for the finance portal.
  * Uses the shared TrollPay library (troll-pay.js) to send a USDC/$TROLL tip
  * straight to the Troll Fund treasury. Each confirmed tip drops a coin in the
- * glass jar (cosmetic, persisted locally so your jar fills over time).
+ * glass jar (cosmetic, session-only — resets on page refresh).
  */
 (function () {
   'use strict';
 
   var COIN_CAP  = 24;            // max coins drawn in the jar
-  var STORE_KEY = 'troll_tip_coins';
+  var coinCount = 0;             // session-only counter (resets on refresh)
   // On-chain memo tag → the transaction log categorizes this as a tip.
   // Format: TR|<category>|<label>
   var TIP_MEMO  = 'TR|tip|Tip';
 
   function $(id) { return document.getElementById(id); }
-  function getCount() {
-    var n = parseInt(localStorage.getItem(STORE_KEY) || '0', 10) || 0;
-    console.log('[tip-jar] getCount from localStorage:', STORE_KEY, '→', n);
-    return n;
-  }
-  function setCount(n) {
-    console.log('[tip-jar] setCount to localStorage:', STORE_KEY, '→', n);
-    try { localStorage.setItem(STORE_KEY, String(n)); } catch (e) { console.error('[tip-jar] localStorage error:', e); }
-  }
+  function getCount() { return coinCount; }
+  function setCount(n) { coinCount = Math.min(n, COIN_CAP); }
 
   function init() {
     var glass   = $('tip-jar-glass');
