@@ -574,6 +574,13 @@ textarea:focus {
       return matchTheme(text, themes) || (kind === "guardian" ? GUARDIAN_FALLBACK : FUD_FALLBACK);
     }
 
+    // Every theme (not just the first match) — lets the body mention a second/third
+    // angle the tweet raises instead of collapsing a multi-claim tweet into one line.
+    function detectAllThemes(text, kind) {
+      const themes = kind === "guardian" ? GUARDIAN_THEMES : FUD_THEMES;
+      return themes.filter((theme) => theme.match.some((re) => re.test(text)));
+    }
+
     function detectDominantSentiment(text) {
       const fudHit = Boolean(matchTheme(text, FUD_THEMES));
       const guardianHit = Boolean(matchTheme(text, GUARDIAN_THEMES));
@@ -585,6 +592,13 @@ textarea:focus {
     function extractPercent(text) {
       const match = String(text || "").match(/\bdown\s+(\d{1,3})%/i);
       return match ? match[1] : "";
+    }
+
+    // A concrete dollar figure ($10m, $25k) is exactly the kind of specific, checkable
+    // detail a receipt should preserve — grab the first one mentioned, if any.
+    function extractDollarAmount(text) {
+      const match = String(text || "").match(/\$\d[\d,.]*\s?[kmb]?\b/i);
+      return match ? match[0].replace(/\s+/g, "") : "";
     }
 
     function hashSeed(value) {
@@ -844,17 +858,64 @@ textarea:focus {
       "It keeps the thesis on the books, not just the panic.",
     ];
 
+    const SECONDARY_CLAIM_CONNECTORS = [
+      (claim) => `It also argues that ${claim}`,
+      (claim) => `The post separately claims ${claim}`,
+      (claim) => `Layered on top of that is the claim that ${claim}`,
+      (claim) => `The receipt additionally notes that ${claim}`,
+    ];
+
+    const FUD_AMOUNT_SENTENCES = [
+      (amount) => `The receipt puts a concrete number on it: ${amount}.`,
+      (amount) => `${amount} is the specific figure being used as evidence.`,
+      (amount) => `That number — ${amount} — is what anchors the claim.`,
+    ];
+
+    const GUARDIAN_AMOUNT_SENTENCES = [
+      (amount) => `The receipt puts a concrete number on it: ${amount}.`,
+      (amount) => `${amount} is the specific figure backing the case.`,
+      (amount) => `That number — ${amount} — is what anchors the conviction.`,
+    ];
+
+    // Builds a 2-5 sentence archive summary that scales with how much distinct content
+    // the tweet actually raises: an opener (primary claim), an optional sentence for a
+    // concrete dollar/percent figure, one sentence per secondary theme the tweet also
+    // touches (max 2), and a closing framing line. Nothing here quotes the tweet
+    // verbatim — everything is paraphrased through the theme/connector templates.
     function summarizeTweetBody(copy, kind) {
       const clean = compactTweetText(copy);
       const lower = clean.toLowerCase();
-      const theme = detectTheme(lower, kind);
+      const matchedThemes = detectAllThemes(lower, kind);
+      const primaryTheme = matchedThemes[0] || (kind === "guardian" ? GUARDIAN_FALLBACK : FUD_FALLBACK);
       const percent = extractPercent(clean);
+      const amount = extractDollarAmount(clean);
       const openers = kind === "guardian" ? GUARDIAN_BODY_OPENERS : FUD_BODY_OPENERS;
       const closers = kind === "guardian" ? GUARDIAN_BODY_CLOSERS : FUD_BODY_CLOSERS;
-      const claim = theme.claim({ percent });
-      const opener = pickBySeed(openers, `${theme.id}:opener:${clean}`)(claim);
-      const closer = pickBySeed(closers, `${theme.id}:closer:${clean}`);
-      let body = `${sentenceCase(opener)}. ${closer}`;
+      const amountSentences = kind === "guardian" ? GUARDIAN_AMOUNT_SENTENCES : FUD_AMOUNT_SENTENCES;
+      const claim = primaryTheme.claim({ percent });
+      const opener = pickBySeed(openers, `${primaryTheme.id}:opener:${clean}`)(claim);
+      const closer = pickBySeed(closers, `${primaryTheme.id}:closer:${clean}`);
+
+      const sentences = [`${sentenceCase(opener)}.`];
+
+      // A dollar figure not already spelled out in the primary claim earns its own line.
+      if (amount && !claim.includes(amount)) {
+        sentences.push(pickBySeed(amountSentences, `${primaryTheme.id}:amount:${clean}`)(amount));
+      }
+
+      const secondaryThemes = matchedThemes.slice(1, 3);
+      // Walk the connector bank sequentially from a hashed start so two secondary
+      // sentences never land on the same phrasing back-to-back.
+      const connectorStart = hashSeed(`${primaryTheme.id}:secondary:${clean}`) % SECONDARY_CLAIM_CONNECTORS.length;
+      secondaryThemes.forEach((theme, index) => {
+        const secondaryClaim = theme.claim({ percent });
+        const connector = SECONDARY_CLAIM_CONNECTORS[(connectorStart + index) % SECONDARY_CLAIM_CONNECTORS.length];
+        sentences.push(`${sentenceCase(connector(secondaryClaim))}.`);
+      });
+
+      sentences.push(closer);
+      let body = sentences.join(" ");
+
       if (textOverlapRatio(body, clean) > OVERLAP_GUARDRAIL_THRESHOLD) {
         const fallback = kind === "guardian" ? GUARDIAN_FALLBACK : FUD_FALLBACK;
         const fallbackOpener = openers[0](fallback.claim());
