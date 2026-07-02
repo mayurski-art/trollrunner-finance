@@ -682,9 +682,17 @@ textarea:focus {
 
     function stripHeadlineNoise(text) {
       return String(text || "")
-        .replace(/["“”‘’]/g, "")
+        // Normalize curly apostrophes to straight ones instead of deleting them —
+        // they're almost always part of a contraction (Y'all, don't), not a wrapping
+        // quote mark. Only actual quote/guillemet punctuation gets removed.
+        .replace(/[''']/g, "'")
+        .replace(/["“”«»]/g, "")
         .replace(/@[A-Za-z0-9_]+/g, "")
         .replace(/#(\w+)/g, "$1")
+        // Strip wallet-address-shaped tokens (base58/hex, 20+ chars) and any
+        // "protocol:address" prefix in front of them — noise, not headline material.
+        .replace(/\b[a-z]+:[A-Za-z0-9]{15,}\b/gi, "")
+        .replace(/\b[A-Za-z0-9]{20,}\b/g, "")
         .replace(/\s+/g, " ")
         .trim();
     }
@@ -697,7 +705,7 @@ textarea:focus {
         .trim();
     }
 
-    const HEADLINE_FILLER_PATTERN = /^(lol+|lmao+|omg|ngl|literally|honestly|smh|bro|bruh|yo|ok(ay)?|well|so|listen|guys|not gonna lie|imo|tbh)[\s,:;.-]+/i;
+    const HEADLINE_FILLER_PATTERN = /^(lol+|lmao+|omg|ngl|literally|honestly|smh|bro|bruh|yo|ok(ay)?|well|so|then|also|listen|guys|not gonna lie|imo|tbh)[\s,:;.-]+/i;
 
     function stripLeadingFiller(text) {
       let result = String(text || "").trim();
@@ -749,10 +757,24 @@ textarea:focus {
       return best;
     }
 
+    // A clause split out at "and"/"but"/a comma often leaves a dangling connective
+    // at its new start (e.g. "...and then tweeting X" -> "then tweeting X"); strip it
+    // so the headline doesn't open on a stray conjunction.
+    function trimTrailingMinorWord(words) {
+      const trimmed = [...words];
+      while (trimmed.length > 3 && TITLE_MINOR_WORDS.has(trimmed[trimmed.length - 1].toLowerCase())) {
+        trimmed.pop();
+      }
+      return trimmed;
+    }
+
     function extractHeadlineClaim(cleanText, kind) {
       const noiseFree = stripInlineTimestamps(stripHeadlineNoise(cleanText)).replace(/·/g, " ").replace(/\s{2,}/g, " ").trim();
       const sentences = noiseFree.split(/[.!?]+\s*/).map((part) => part.trim()).filter(Boolean);
-      const allClauses = sentences.flatMap((sentence) => splitIntoClauses(stripLeadingFiller(sentence)));
+      const allClauses = sentences
+        .flatMap((sentence) => splitIntoClauses(stripLeadingFiller(sentence)))
+        .map((clause) => stripLeadingFiller(clause))
+        .filter(Boolean);
       // Prefer clauses long enough to stand alone as a headline; a short-but-high-scoring
       // fragment like "Down 92%" shouldn't win over a fuller clause that says more.
       const substantialClauses = allClauses.filter((clause) => clause.split(/\s+/).filter(Boolean).length >= 3);
@@ -761,7 +783,8 @@ textarea:focus {
       if (!pool.length) return "";
 
       const best = pickBestClause(pool, kind);
-      return best.split(/\s+/).filter(Boolean).slice(0, 12).join(" ").replace(/[,:;-]+$/, "").trim();
+      const words = trimTrailingMinorWord(best.split(/\s+/).filter(Boolean).slice(0, 12));
+      return words.join(" ").replace(/[,:;-]+$/, "").trim();
     }
 
     // Primary path: a one-line summary lifted straight from the tweet's strongest claim,
@@ -977,23 +1000,28 @@ textarea:focus {
         if (!response.ok) return null;
         const payload = await response.json();
         const text = normalizeTweetCopy(payload?.text || "");
-        const eventDate = payload?.created_at ? new Date(payload.created_at).toISOString() : "";
-        const screenName = String(payload?.user?.screen_name || "").trim();
-        const canonicalSourceHref = screenName
-          ? `https://x.com/${screenName}/status/${tweetId}`
-          : canonicalizeTweetUrl(sourceHref);
-        return {
-          handle: screenName || extractHandle("", sourceHref),
-          text,
-          eventDate: Number.isNaN(new Date(eventDate).getTime()) ? "" : eventDate,
-          sourceHref: canonicalSourceHref,
-          metrics: {
-            views: Number(payload?.views?.count || payload?.view_count || 0) || 0,
-            likes: Number(payload?.favorite_count || payload?.favoriteCount || 0) || 0,
-            replies: Number(payload?.conversation_count || payload?.reply_count || 0) || 0,
-            reposts: Number(payload?.retweet_count || 0) || 0,
-          },
-        };
+        // The syndication endpoint sometimes returns a 200 with an empty `{}` body
+        // (no usable text) instead of a non-ok status. Treat that as a miss and fall
+        // through to the oEmbed endpoint below rather than returning empty content.
+        if (text) {
+          const eventDate = payload?.created_at ? new Date(payload.created_at).toISOString() : "";
+          const screenName = String(payload?.user?.screen_name || "").trim();
+          const canonicalSourceHref = screenName
+            ? `https://x.com/${screenName}/status/${tweetId}`
+            : canonicalizeTweetUrl(sourceHref);
+          return {
+            handle: screenName || extractHandle("", sourceHref),
+            text,
+            eventDate: Number.isNaN(new Date(eventDate).getTime()) ? "" : eventDate,
+            sourceHref: canonicalSourceHref,
+            metrics: {
+              views: Number(payload?.views?.count || payload?.view_count || 0) || 0,
+              likes: Number(payload?.favorite_count || payload?.favoriteCount || 0) || 0,
+              replies: Number(payload?.conversation_count || payload?.reply_count || 0) || 0,
+              reposts: Number(payload?.retweet_count || 0) || 0,
+            },
+          };
+        }
       } catch (error) {
         console.error("Unable to fetch tweet details", error);
       }
