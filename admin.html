@@ -662,8 +662,8 @@ textarea:focus {
     }
 
     const TITLE_MINOR_WORDS = new Set([
-      "a", "an", "and", "as", "at", "but", "by", "for", "in", "nor", "of", "on", "or",
-      "so", "the", "to", "up", "yet", "with", "from", "into", "over", "than", "vs",
+      "a", "an", "and", "as", "at", "about", "but", "by", "for", "in", "nor", "of", "on",
+      "or", "so", "the", "to", "up", "yet", "with", "from", "into", "over", "than", "vs",
     ]);
 
     // Title-cases a headline while preserving all-caps tokens like tickers ($TROLL, TROLL)
@@ -695,6 +695,20 @@ textarea:focus {
         .replace(/\b[A-Za-z0-9]{20,}\b/g, "")
         .replace(/\s+/g, " ")
         .trim();
+    }
+
+    const DECIMAL_POINT_PLACEHOLDER = "XDECIMALPOINTX";
+
+    // Sentence-splitting on [.!?] would otherwise break "2.5b" into "2" + "5b" — a digit
+    // before AND after the period is the real signal of a decimal, not just a sentence
+    // that happens to end in a number (e.g. "It is 2026."). Mask true decimals first,
+    // split normally, then restore them.
+    function splitIntoSentences(text) {
+      const protectedText = String(text || "").replace(/(\d)\.(\d)/g, `$1${DECIMAL_POINT_PLACEHOLDER}$2`);
+      return protectedText
+        .split(/[.!?]+\s*/)
+        .map((part) => part.replace(new RegExp(DECIMAL_POINT_PLACEHOLDER, "g"), ".").trim())
+        .filter(Boolean);
     }
 
     function stripInlineTimestamps(text) {
@@ -730,13 +744,15 @@ textarea:focus {
     ];
 
     // Favors clauses whose theme matches the selected mode, so a mixed tweet still
-    // yields a headline relevant to how it was filed (FUD vs Guardian).
+    // yields a headline relevant to how it was filed (FUD vs Guardian). No standalone
+    // digit bonus — a bare number ("it is 2026") shouldn't outrank a longer, more
+    // characterful clause just because it contains a digit; length tie-breaking in
+    // pickBestClause already favors the fuller clause when nothing scores a theme match.
     function scoreHeadlineClause(lowerClause, kind) {
       let score = 0;
       for (const { theme, kind: themeKind } of ALL_THEMES_FOR_SCORING) {
         if (theme.match.some((re) => re.test(lowerClause))) score += themeKind === kind ? 3 : 1;
       }
-      if (/\d/.test(lowerClause)) score += 1;
       return score;
     }
 
@@ -760,9 +776,13 @@ textarea:focus {
     // A clause split out at "and"/"but"/a comma often leaves a dangling connective
     // at its new start (e.g. "...and then tweeting X" -> "then tweeting X"); strip it
     // so the headline doesn't open on a stray conjunction.
+    const TRAILING_ONLY_TRIM_WORDS = new Set(["my", "your", "his", "her", "its", "our", "their"]);
+
     function trimTrailingMinorWord(words) {
       const trimmed = [...words];
-      while (trimmed.length > 3 && TITLE_MINOR_WORDS.has(trimmed[trimmed.length - 1].toLowerCase())) {
+      while (trimmed.length > 3) {
+        const last = trimmed[trimmed.length - 1].toLowerCase();
+        if (!TITLE_MINOR_WORDS.has(last) && !TRAILING_ONLY_TRIM_WORDS.has(last)) break;
         trimmed.pop();
       }
       return trimmed;
@@ -770,7 +790,7 @@ textarea:focus {
 
     function extractHeadlineClaim(cleanText, kind) {
       const noiseFree = stripInlineTimestamps(stripHeadlineNoise(cleanText)).replace(/·/g, " ").replace(/\s{2,}/g, " ").trim();
-      const sentences = noiseFree.split(/[.!?]+\s*/).map((part) => part.trim()).filter(Boolean);
+      const sentences = splitIntoSentences(noiseFree);
       const allClauses = sentences
         .flatMap((sentence) => splitIntoClauses(stripLeadingFiller(sentence)))
         .map((clause) => stripLeadingFiller(clause))
@@ -783,7 +803,7 @@ textarea:focus {
       if (!pool.length) return "";
 
       const best = pickBestClause(pool, kind);
-      const words = trimTrailingMinorWord(best.split(/\s+/).filter(Boolean).slice(0, 12));
+      const words = trimTrailingMinorWord(best.split(/\s+/).filter(Boolean).slice(0, 14));
       return words.join(" ").replace(/[,:;-]+$/, "").trim();
     }
 
@@ -950,10 +970,7 @@ textarea:focus {
     }
 
     function collapseDuplicateSentences(text) {
-      const parts = String(text || "")
-        .split(/[.!?]+\s+/)
-        .map((part) => part.trim())
-        .filter(Boolean);
+      const parts = splitIntoSentences(text);
       const deduped = [];
       for (const part of parts) {
         if (deduped.some((existing) => areEquivalentTweetLines(existing, part))) continue;
@@ -1030,14 +1047,20 @@ textarea:focus {
         const response = await fetch(oembedUrl, { cache: "no-store" });
         if (!response.ok) return null;
         const payload = await response.json();
+        if (!payload?.html) return null; // e.g. {"error":"not authorized to see this status"}
+        // <br> contributes nothing to textContent, so back-to-back line breaks (very
+        // common in tweet formatting) would otherwise glue unrelated thoughts into one
+        // run-on sentence. Turn them into real sentence boundaries before parsing.
+        const htmlWithBreaks = String(payload.html).replace(/<br\s*\/?>/gi, ". ");
         const parser = new DOMParser();
-        const doc = parser.parseFromString(String(payload?.html || ""), "text/html");
+        const doc = parser.parseFromString(htmlWithBreaks, "text/html");
         const blockquote = doc.querySelector("blockquote.twitter-tweet");
         const paragraph = blockquote?.querySelector("p");
         const links = Array.from(blockquote?.querySelectorAll("a") || []);
         const dateLink = links.length ? links[links.length - 1] : null;
         const rawText = paragraph ? paragraph.textContent || "" : "";
         const text = normalizeTweetCopy(rawText);
+        if (!text) return null;
         const dateText = String(dateLink?.textContent || "").trim();
         const parsedDate = dateText ? new Date(dateText) : null;
         const eventDate = parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate.toISOString() : "";
