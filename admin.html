@@ -456,35 +456,196 @@ textarea:focus {
       ].map(([label, value]) => `${formatMetricCount(value)} ${label}`).join(" | ");
     }
 
-    function deriveTags(copy, kind, eventDate = "") {
-      const text = String(copy || "").toLowerCase();
-      const orderedTags = [];
-      const tagMap = [
-        ["exit-liquidity", ["exit liquidity"]],
-        ["shitcoin-accusation", ["shitcoin", "shill"]],
-        ["drawdown-watch", ["down 92", "down 90", "drawdown", "down bad"]],
-        ["receipts", ["followers", "latest", "started", "since"]],
-        ["funding", ["dumping millions", "dump millions", "funding", "fund "]],
-        ["airdrop", ["airdrop"]],
-        ["going-to-zero", ["going to zero", "zero"]],
-        ["conviction", ["conviction", "believe", "belief"]],
-        ["community", ["community", "holders", "holder"]],
-        ["main-character", ["main character"]],
-        ["trend", ["trend", "trending", "revived"]],
-        ["chart-crime", ["chart", "candles", "price"]],
-        ["billions", ["billion", "billions"]],
-        ["bagwork", ["bagwork", "run", "miles"]],
-        ["execution", ["execution", "team", "roadmap"]],
-        ["creator-fees", ["creator fee", "buyback"]],
-        ["culture", ["meme", "lore", "culture"]],
-        ["pico-lows", ["pico", "lows", "low"]],
-      ];
-      for (const [tag, needles] of tagMap) {
-        if (needles.some((needle) => text.includes(needle))) orderedTags.push(tag);
+    // Theme banks drive both title/body generation and tag derivation. Titles/claims are
+    // hand-written archive copy, never raw tweet text, so the overlap guardrail (see
+    // textOverlapRatio) almost never has to intervene.
+    const FUD_THEMES = [
+      {
+        id: "going-to-zero",
+        match: [/going to zero/i, /\bto zero\b/i, /\bzero\b/i, /worthless/i],
+        tags: ["going-to-zero", "top-signal"],
+        claim: ({ percent }) => (percent
+          ? `TROLL is down ${percent}% and headed to zero`
+          : "TROLL is finished, overhyped, or headed to zero"),
+        titles: [
+          "Zero-Call Enters the Ledger",
+          "Another “It’s Over” Receipt",
+          "Doom Call Meets the Chart",
+          "The Zero Prediction, Archived",
+        ],
+      },
+      {
+        id: "exit-liquidity",
+        match: [/exit liquidity/i],
+        tags: ["exit-liquidity", "receipts"],
+        claim: () => "the community is being set up as exit liquidity",
+        titles: ["The Exit Liquidity Accusation", "Followers-as-Liquidity, Filed", "The Exit Liquidity Sermon"],
+      },
+      {
+        id: "shitcoin-accusation",
+        match: [/shitcoin/i, /\bshill\b/i, /\bscam\b/i],
+        tags: ["shitcoin-accusation", "anti-troll-sermon"],
+        claim: () => "the token is a low-effort shitcoin riding hype instead of substance",
+        titles: ["The Shitcoin Sermon", "Shill-Desk Verdict", "The Scam Accusation Enters the Chat"],
+      },
+      {
+        id: "drawdown-watch",
+        match: [/\bdown\s+\d{1,3}%/i, /drawdown/i, /down bad/i, /\bcrash(ed)?\b/i, /\bdump(ed|ing)?\b/i],
+        tags: ["drawdown-watch", "panic-cycle"],
+        claim: ({ percent }) => (percent
+          ? `the ${percent}% drawdown proves the project is failing`
+          : "the drawdown proves the project is failing"),
+        titles: ["Drawdown Panic Gets Archived", "The Crash Narrative, Logged", "Panic Cycle Hits the Chart"],
+      },
+      {
+        id: "top-signal",
+        match: [/called the top/i, /topped out/i, /\bpeaked\b/i, /it'?s over/i],
+        tags: ["top-signal", "capitulation"],
+        claim: () => "this is the top and the run is over",
+        titles: ["FUD Desk Calls the Top Again", "The Top Call, For the Record", "“It’s Over” Goes on Record"],
+      },
+      {
+        id: "influencer-fud",
+        match: [/influencer/i, /grifter/i, /paid promo/i],
+        tags: ["influencer-fud", "market-fear"],
+        claim: () => "the promotion itself is the problem, not just the price",
+        titles: ["The Grift Accusation, Filed", "Influencer FUD Enters the Chat"],
+      },
+    ];
+
+    const FUD_FALLBACK = {
+      id: "fud-generic",
+      tags: ["market-fear", "receipts"],
+      claim: () => "the project is overhyped, mismanaged, or already done",
+      titles: ["Another Doom Call Archived", "FUD Desk Files a Receipt", "The Panic Post, Logged", "Bear Case Enters the Ledger"],
+    };
+
+    const GUARDIAN_THEMES = [
+      {
+        id: "conviction",
+        match: [/conviction/i, /\bbelieve\b/i, /\bbelief\b/i, /\bhold\b/i, /diamond hands/i],
+        tags: ["conviction", "belief"],
+        claim: () => "long-term holders aren't rattled by the dip",
+        titles: ["Guardian Receipt: Conviction Holds", "The Timeline Defends the Thesis", "Conviction Gets Logged"],
+      },
+      {
+        id: "community",
+        match: [/\bcommunity\b/i, /\bholders?\b/i, /\bfamily\b/i],
+        tags: ["community", "culture"],
+        claim: () => "the community itself is the strongest part of the thesis",
+        titles: ["Community Defense Enters the Chat", "The Community Answers Back", "Holder Conviction Gets Logged"],
+      },
+      {
+        id: "bull-thesis",
+        match: [/\bbull\b/i, /\bmoon\b/i, /\bbillion\b/i, /undervalued/i],
+        tags: ["bull-thesis", "long-term"],
+        claim: () => "the project is undervalued and the bull case is still intact",
+        titles: ["The Bull Case Answers Back", "Billion-Dollar Thesis, Defended"],
+      },
+      {
+        id: "proof-of-work",
+        match: [/bagwork/i, /\bmiles\b/i, /\brunning\b/i, /\bgrind\b/i],
+        tags: ["proof-of-work", "bagwork"],
+        claim: () => "the real-world work behind the project is the counterweight to the panic",
+        titles: ["Proof-of-Work Over Panic", "Bagwork Enters the Ledger", "The Grind Gets Archived"],
+      },
+      {
+        id: "revival",
+        match: [/revival/i, /comeback/i, /recovering/i, /\bresilien/i],
+        tags: ["revival", "holder-defense"],
+        claim: () => "the comeback narrative is alive and well",
+        titles: ["The Comeback Case, Filed", "Revival Receipt Enters the Chat"],
+      },
+    ];
+
+    const GUARDIAN_FALLBACK = {
+      id: "guardian-generic",
+      tags: ["belief", "guardian"],
+      claim: () => "the thesis is still intact despite the noise",
+      titles: ["Guardian Receipt: Conviction Holds", "The Timeline Defends the Thesis", "Holder Conviction Gets Logged"],
+    };
+
+    function matchTheme(text, themes) {
+      return themes.find((theme) => theme.match.some((re) => re.test(text))) || null;
+    }
+
+    function detectTheme(text, kind) {
+      const themes = kind === "guardian" ? GUARDIAN_THEMES : FUD_THEMES;
+      return matchTheme(text, themes) || (kind === "guardian" ? GUARDIAN_FALLBACK : FUD_FALLBACK);
+    }
+
+    function detectDominantSentiment(text) {
+      const fudHit = Boolean(matchTheme(text, FUD_THEMES));
+      const guardianHit = Boolean(matchTheme(text, GUARDIAN_THEMES));
+      if (fudHit && !guardianHit) return "fud";
+      if (guardianHit && !fudHit) return "guardian";
+      return "neutral";
+    }
+
+    function extractPercent(text) {
+      const match = String(text || "").match(/\bdown\s+(\d{1,3})%/i);
+      return match ? match[1] : "";
+    }
+
+    function hashSeed(value) {
+      let hash = 0;
+      const text = String(value || "");
+      for (let i = 0; i < text.length; i++) {
+        hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
       }
-      if (kind === "guardian" && !orderedTags.includes("community")) orderedTags.push("community");
-      if (kind === "fud" && !orderedTags.includes("receipts")) orderedTags.push("receipts");
-      return withEventMonthTag(orderedTags, eventDate);
+      return hash;
+    }
+
+    function pickBySeed(list, seed) {
+      if (!list.length) return "";
+      return list[hashSeed(seed) % list.length];
+    }
+
+    const OVERLAP_STOPWORDS = new Set([
+      "this", "that", "with", "from", "have", "just", "your", "about", "into", "been",
+      "were", "they", "them", "then", "than", "also", "some", "what", "when", "where",
+      "which", "while", "would", "could", "should", "there", "their", "being", "over",
+      "after", "before", "still", "against", "instead", "record", "records", "archive",
+      "archived", "ledger",
+    ]);
+
+    function significantWords(text) {
+      return (String(text || "").toLowerCase().match(/[a-z0-9$]{4,}/g) || [])
+        .filter((word) => !OVERLAP_STOPWORDS.has(word));
+    }
+
+    // Guardrail from the spec: generated copy should not be a near-restatement of the
+    // pasted tweet. Ratio = share of generated-text words that also appear verbatim in
+    // the source tweet.
+    function textOverlapRatio(generated, source) {
+      const generatedWords = significantWords(generated);
+      if (!generatedWords.length) return 0;
+      const sourceWords = new Set(significantWords(source));
+      const overlap = generatedWords.filter((word) => sourceWords.has(word)).length;
+      return overlap / generatedWords.length;
+    }
+
+    const OVERLAP_GUARDRAIL_THRESHOLD = 0.55;
+
+    function deriveTags(copy, kind, eventDate = "") {
+      const lower = String(copy || "").toLowerCase();
+      const theme = detectTheme(lower, kind);
+      const orderedTags = [kind, ...theme.tags];
+
+      const extraTagMap = [
+        ["airdrop", [/airdrop/i]],
+        ["chart-crime", [/\bchart\b/i, /\bcandles?\b/i]],
+        ["bear-posting", [/bear post/i, /\bbearish\b/i]],
+        ["culture", [/\bmeme\b/i, /\blore\b/i, /\bculture\b/i]],
+        ["troll-runner", [/troll ?runner/i, /\brunning\b/i, /\bmiles\b/i]],
+        ["long-term", [/long.?term/i, /\bhodl\b/i]],
+      ];
+      for (const [tag, patterns] of extraTagMap) {
+        if (orderedTags.length >= 5) break;
+        if (!orderedTags.includes(tag) && patterns.some((re) => re.test(lower))) orderedTags.push(tag);
+      }
+
+      return withEventMonthTag([...new Set(orderedTags)].slice(0, 5), eventDate);
     }
 
     function sentenceCase(value) {
@@ -500,60 +661,163 @@ textarea:focus {
         .trim();
     }
 
-    function pickReceiptFrame(copy, kind) {
-      const text = compactTweetText(copy);
-      const lower = text.toLowerCase();
-      if (lower.includes("exit liquidity")) return "Exit-liquidity alarm";
-      if (lower.includes("shitcoin") || lower.includes("shill")) return "Shill-police indictment";
-      if (lower.includes("down 92") || lower.includes("down 90")) return "Drawdown receipt";
-      if (lower.includes("going to zero") || /\bzero\b/.test(lower)) return "Zero-call archive";
-      if (lower.includes("roadmap") || lower.includes("execution")) return "Execution audit";
-      if (lower.includes("airdrop")) return "Airdrop counterfactual";
-      if (lower.includes("community") && kind === "guardian") return "Community defense file";
-      if (lower.includes("bagwork") || lower.includes("miles") || lower.includes("run")) return "Bagwork proof";
-      if (lower.includes("billion")) return "Billion-thesis marker";
-      return kind === "guardian" ? "Guardian receipt" : "FUD receipt";
+    const TITLE_MINOR_WORDS = new Set([
+      "a", "an", "and", "as", "at", "but", "by", "for", "in", "nor", "of", "on", "or",
+      "so", "the", "to", "up", "yet", "with", "from", "into", "over", "than", "vs",
+    ]);
+
+    // Title-cases a headline while preserving all-caps tokens like tickers ($TROLL, TROLL)
+    // and lowercasing minor words in the middle (never first/last).
+    function toTitleCase(text) {
+      const words = String(text || "").split(/\s+/).filter(Boolean);
+      return words
+        .map((word, index) => {
+          if (/^[A-Z0-9$]+$/.test(word) && word.length > 1) return word;
+          const lower = word.toLowerCase();
+          if (index !== 0 && index !== words.length - 1 && TITLE_MINOR_WORDS.has(lower)) return lower;
+          return lower.charAt(0).toUpperCase() + lower.slice(1);
+        })
+        .join(" ");
     }
 
+    function stripHeadlineNoise(text) {
+      return String(text || "")
+        .replace(/["“”‘’]/g, "")
+        .replace(/@[A-Za-z0-9_]+/g, "")
+        .replace(/#(\w+)/g, "$1")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function stripInlineTimestamps(text) {
+      return String(text || "")
+        .replace(/\b\d{1,2}:\d{2}\s?(?:AM|PM)\s*[·|]?\s*[A-Za-z]{3,9}\.?\s+\d{1,2},\s+\d{4}\b/gi, "")
+        .replace(/\b[A-Za-z]{3,9}\.?\s+\d{1,2},\s+\d{4}\b/gi, "")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+    }
+
+    const HEADLINE_FILLER_PATTERN = /^(lol+|lmao+|omg|ngl|literally|honestly|smh|bro|bruh|yo|ok(ay)?|well|so|listen|guys|not gonna lie|imo|tbh)[\s,:;.-]+/i;
+
+    function stripLeadingFiller(text) {
+      let result = String(text || "").trim();
+      let previous;
+      do {
+        previous = result;
+        result = result.replace(HEADLINE_FILLER_PATTERN, "").trim();
+      } while (result !== previous && result.length);
+      return result;
+    }
+
+    function splitIntoClauses(sentence) {
+      return String(sentence || "")
+        .split(/,|\band\b|\bbut\b|\bbecause\b|\bwhile\b/i)
+        .map((part) => part.trim())
+        .filter(Boolean);
+    }
+
+    const ALL_THEMES_FOR_SCORING = [
+      ...FUD_THEMES.map((theme) => ({ theme, kind: "fud" })),
+      ...GUARDIAN_THEMES.map((theme) => ({ theme, kind: "guardian" })),
+    ];
+
+    // Favors clauses whose theme matches the selected mode, so a mixed tweet still
+    // yields a headline relevant to how it was filed (FUD vs Guardian).
+    function scoreHeadlineClause(lowerClause, kind) {
+      let score = 0;
+      for (const { theme, kind: themeKind } of ALL_THEMES_FOR_SCORING) {
+        if (theme.match.some((re) => re.test(lowerClause))) score += themeKind === kind ? 3 : 1;
+      }
+      if (/\d/.test(lowerClause)) score += 1;
+      return score;
+    }
+
+    // Pulls the single most newsworthy clause out of the tweet itself (not a canned
+    // phrase) so the headline reads as a one-line summary of that specific tweet.
+    function pickBestClause(clauses, kind) {
+      let best = clauses[0];
+      let bestScore = -1;
+      for (const clause of clauses) {
+        const score = scoreHeadlineClause(clause.toLowerCase(), kind);
+        const words = clause.split(/\s+/).filter(Boolean).length;
+        const bestWords = best.split(/\s+/).filter(Boolean).length;
+        if (score > bestScore || (score === bestScore && words > bestWords)) {
+          best = clause;
+          bestScore = score;
+        }
+      }
+      return best;
+    }
+
+    function extractHeadlineClaim(cleanText, kind) {
+      const noiseFree = stripInlineTimestamps(stripHeadlineNoise(cleanText)).replace(/·/g, " ").replace(/\s{2,}/g, " ").trim();
+      const sentences = noiseFree.split(/[.!?]+\s*/).map((part) => part.trim()).filter(Boolean);
+      const allClauses = sentences.flatMap((sentence) => splitIntoClauses(stripLeadingFiller(sentence)));
+      // Prefer clauses long enough to stand alone as a headline; a short-but-high-scoring
+      // fragment like "Down 92%" shouldn't win over a fuller clause that says more.
+      const substantialClauses = allClauses.filter((clause) => clause.split(/\s+/).filter(Boolean).length >= 3);
+      const fallbackClauses = allClauses.filter((clause) => clause.split(/\s+/).filter(Boolean).length >= 2);
+      const pool = substantialClauses.length ? substantialClauses : fallbackClauses;
+      if (!pool.length) return "";
+
+      const best = pickBestClause(pool, kind);
+      return best.split(/\s+/).filter(Boolean).slice(0, 12).join(" ").replace(/[,:;-]+$/, "").trim();
+    }
+
+    // Primary path: a one-line summary lifted straight from the tweet's strongest claim,
+    // cleaned of junk and title-cased. Falls back to the curated theme bank only when the
+    // tweet has nothing substantive to summarize (e.g. a bare link or a one-word post).
     function summarizeTitle(copy, handle, kind) {
       const clean = compactTweetText(copy);
-      const frame = pickReceiptFrame(clean, kind);
-      const actor = handle ? `@${handle}` : (kind === "guardian" ? "Guardian" : "FUD desk");
-      const lower = clean.toLowerCase();
-      let angle = "";
-      const percent = clean.match(/\bdown\s+(\d{1,3})%/i);
-      if (percent) angle = `${percent[1]}% drawdown becomes the evidence`;
-      else if (lower.includes("exit liquidity")) angle = "followers-as-exit-liquidity charge";
-      else if (lower.includes("going to zero")) angle = "zero-call goes on the ledger";
-      else if (lower.includes("airdrop")) angle = "airdrop hindsight enters the chat";
-      else if (lower.includes("billion")) angle = "billion thesis gets defended";
-      else if (lower.includes("bagwork") || lower.includes("miles")) angle = "proof-of-work leaves the timeline";
-      else angle = sentenceCase(clean.split(/[.!?]/)[0] || "receipt archived").slice(0, 70);
-      return `${actor} | ${frame}: ${angle}`;
+      const claim = extractHeadlineClaim(clean, kind);
+      const wordCount = claim ? claim.split(/\s+/).filter(Boolean).length : 0;
+      if (wordCount >= 3) return toTitleCase(claim);
+      const theme = detectTheme(clean.toLowerCase(), kind);
+      return pickBySeed(theme.titles, `${theme.id}:${clean}`);
     }
+
+    const FUD_BODY_OPENERS = [
+      (claim) => `This receipt frames TROLL as ${claim}`,
+      (claim) => `The claim on record: ${claim}`,
+      (claim) => `Another FUD entry hits the ledger, arguing ${claim}`,
+      (claim) => `Archived here: the case that ${claim}`,
+    ];
+    const FUD_BODY_CLOSERS = [
+      "The panic cycle stays attached to the chart, not just the timeline.",
+      "It goes on record next to the price action so the doom call can be graded later.",
+      "Filed as a receipt so the FUD stays traceable against what actually happened.",
+      "Logged next to the chart so the narrative doesn't quietly disappear.",
+    ];
+    const GUARDIAN_BODY_OPENERS = [
+      (claim) => `This guardian receipt pushes back on the panic, arguing ${claim}`,
+      (claim) => `The defense on record: ${claim}`,
+      (claim) => `Filed as a guardian entry: the case here is that ${claim}`,
+      (claim) => `Archived here: the pushback that ${claim}`,
+    ];
+    const GUARDIAN_BODY_CLOSERS = [
+      "It frames the moment as conviction, community, or proof-of-work instead of collapse.",
+      "Logged as part of the case for sticking around.",
+      "Filed next to the chart so the bull case has a record too.",
+      "It keeps the thesis on the books, not just the panic.",
+    ];
 
     function summarizeTweetBody(copy, kind) {
       const clean = compactTweetText(copy);
       const lower = clean.toLowerCase();
-      const claims = [];
-      const percent = clean.match(/\bdown\s+(\d{1,3})%\b/i);
-      if (percent) claims.push(`claims the promoted coin is down ${percent[1]}%`);
-      if (lower.includes("exit liquidity")) claims.push("frames followers as potential exit liquidity");
-      if (lower.includes("shitcoin")) claims.push("attacks the coin quality directly");
-      if (lower.includes("shill")) claims.push("accuses the account of shilling");
-      if (lower.includes("going to zero") || /\bzero\b/.test(lower)) claims.push("puts a zero-call on record");
-      if (lower.includes("airdrop")) claims.push("argues an airdrop would have been better than buying");
-      if (lower.includes("execution") || lower.includes("roadmap")) claims.push("turns the complaint into an execution audit");
-      if (lower.includes("bagwork") || lower.includes("miles") || lower.includes("run")) claims.push("points to IRL work as the counterweight");
-      if (lower.includes("community")) claims.push("makes the community itself part of the thesis");
-      if (!claims.length) {
-        const firstSentence = clean.split(/[.!?]/).map((part) => part.trim()).filter(Boolean)[0] || clean;
-        return `${kind === "guardian" ? "Guardian receipt" : "FUD receipt"} archived: ${sentenceCase(firstSentence).slice(0, 170)}.`;
+      const theme = detectTheme(lower, kind);
+      const percent = extractPercent(clean);
+      const openers = kind === "guardian" ? GUARDIAN_BODY_OPENERS : FUD_BODY_OPENERS;
+      const closers = kind === "guardian" ? GUARDIAN_BODY_CLOSERS : FUD_BODY_CLOSERS;
+      const claim = theme.claim({ percent });
+      const opener = pickBySeed(openers, `${theme.id}:opener:${clean}`)(claim);
+      const closer = pickBySeed(closers, `${theme.id}:closer:${clean}`);
+      let body = `${sentenceCase(opener)}. ${closer}`;
+      if (textOverlapRatio(body, clean) > OVERLAP_GUARDRAIL_THRESHOLD) {
+        const fallback = kind === "guardian" ? GUARDIAN_FALLBACK : FUD_FALLBACK;
+        const fallbackOpener = openers[0](fallback.claim());
+        body = `${sentenceCase(fallbackOpener)}. ${closers[0]}`;
       }
-      const prefix = kind === "guardian"
-        ? "Guardian-side receipt:"
-        : "FUD-side receipt:";
-      return `${prefix} ${sentenceCase(claims.join(", "))}. The original post is preserved as the source, but this card records the claim instead of copy-pasting the tweet.`;
+      return body;
     }
 
     function stripTrailingTweetUrlPunctuation(value) {
@@ -631,9 +895,13 @@ textarea:focus {
       const trimmed = String(line || "").trim();
       if (!trimmed) return true;
       if (/^https?:\/\//i.test(trimmed)) return true;
+      if (/^pic\.twitter\.com\//i.test(trimmed)) return true;
       if (/^\d{1,2}:\d{2}\s?(?:AM|PM)\b/i.test(trimmed)) return true;
       if (/^[A-Za-z]{3,9}\.?\s+\d{1,2},\s+\d{4}\b/i.test(trimmed)) return true;
       if (/^\d{1,2}\/\d{1,2}\/\d{4}\b/.test(trimmed)) return true;
+      if (/^(show this thread|quote tweet|replying to|translate (post|tweet)|·\s*follow)/i.test(trimmed)) return true;
+      if (/^@[A-Za-z0-9_]{2,20}$/.test(trimmed)) return true;
+      if (/^[\d,.]+[KkMm]?\s*(views?|likes?|repl(?:y|ies)|reposts?|retweets?|quotes?|bookmarks?|followers?)$/i.test(trimmed)) return true;
       return false;
     }
 
@@ -668,7 +936,9 @@ textarea:focus {
         if (deduped.some((existing) => areEquivalentTweetLines(existing, part))) continue;
         deduped.push(part);
       }
-      return deduped.join(" ").trim();
+      // Preserve sentence boundaries on rejoin — losing them here would make two
+      // unrelated sentences read as one run-on clause downstream (title extraction).
+      return deduped.join(". ").trim();
     }
 
     function buildTweetCopyFromPaste(rawText, sourceHref) {
@@ -766,19 +1036,44 @@ textarea:focus {
       return pasted.length >= fetched.length ? pasted : fetched;
     }
 
-    async function parseTweetPaste(rawText, kind) {
+    // Date priority per spec: fetched tweet metadata > Snowflake ID timestamp > timestamp
+    // line in the pasted text > date already sitting in the admin form > current time.
+    // Only the last two count as "low confidence" since neither comes from the tweet itself.
+    function resolveEventDate(fetched, tweetIdDate, pastedDate, existingFormDateIso) {
+      if (fetched) return { eventDate: fetched, confidence: "high" };
+      if (tweetIdDate) return { eventDate: tweetIdDate, confidence: "high" };
+      if (pastedDate) return { eventDate: pastedDate, confidence: "high" };
+      if (existingFormDateIso) return { eventDate: existingFormDateIso, confidence: "low" };
+      return { eventDate: new Date().toISOString(), confidence: "low" };
+    }
+
+    async function parseTweetPaste(rawText, kind, existingFormDateIso = "") {
       const sourceHref = extractFirstUrl(rawText);
-      const tweetDate = dateFromTweetId(extractTweetId(sourceHref));
+      const tweetIdDate = dateFromTweetId(extractTweetId(sourceHref));
       const pasted = buildTweetCopyFromPaste(rawText, sourceHref);
       const fetched = sourceHref ? await fetchTweetDetails(sourceHref) : null;
       const handle = fetched?.handle || pasted.handle || extractHandle(rawText, sourceHref);
       const rawCopy = pickBestTweetCopy(pasted.copy, fetched?.text) || String(rawText || "").trim();
       const copy = summarizeTweetBody(rawCopy, kind);
-      const eventDate = fetched?.eventDate || extractDate(rawText) || tweetDate || new Date().toISOString();
+      const { eventDate, confidence: dateConfidence } = resolveEventDate(
+        fetched?.eventDate,
+        tweetIdDate,
+        extractDate(rawText),
+        existingFormDateIso
+      );
       const resolvedSourceHref = fetched?.sourceHref || sourceHref;
+      const dominantSentiment = detectDominantSentiment(rawCopy);
+      const modeWarning = dominantSentiment !== "neutral" && dominantSentiment !== kind;
+      // If we had a link to fetch from but got nothing back, and the paste itself carried
+      // little more than the link/ID, we're leaning on the weakest fallback path.
+      const fetchFallback = Boolean(sourceHref) && !fetched && compactTweetText(pasted.copy).length < 12;
       return {
         kind,
         eventDate,
+        dateConfidence,
+        modeWarning,
+        dominantSentiment,
+        fetchFallback,
         title: summarizeTitle(rawCopy, handle, kind),
         copy,
         tags: deriveTags(rawCopy, kind, eventDate),
@@ -1010,6 +1305,8 @@ textarea:focus {
       const rawText = document.getElementById("raw-paste").value.trim();
       const sourceInput = document.getElementById("entry-source-href").value.trim();
       const kind = document.getElementById("entry-kind").value;
+      const existingFormDateLocal = document.getElementById("entry-date").value;
+      const existingFormDateIso = existingFormDateLocal ? new Date(existingFormDateLocal).toISOString() : "";
       const parseButton = document.getElementById("parse-btn");
       const parseInput = rawText || sourceInput;
       if (!parseInput) {
@@ -1019,7 +1316,7 @@ textarea:focus {
       parseButton.disabled = true;
       setStatus("Parsing tweet and checking the X link for extra details...");
       try {
-        const parsed = await parseTweetPaste(parseInput, kind);
+        const parsed = await parseTweetPaste(parseInput, kind, existingFormDateIso);
         document.getElementById("entry-date").value = toDatetimeLocalValue(parsed.eventDate);
         document.getElementById("entry-title").value = parsed.title;
         document.getElementById("entry-copy").value = parsed.copy;
@@ -1028,7 +1325,18 @@ textarea:focus {
         document.getElementById("entry-source-href").value = parsed.sourceHref;
         pendingEntryMetrics = parsed.metrics || { views: 0, likes: 0, replies: 0, reposts: 0 };
         renderPreview();
-        setStatus("Paste parsed. Review the fields and save when ready.");
+
+        const notes = [];
+        if (parsed.fetchFallback) {
+          notes.push("Could not fetch tweet metadata, so the parser used pasted text and tweet ID fallback.");
+        }
+        if (parsed.dateConfidence === "low") {
+          notes.push("Parsed, but date confidence is low. Please review the event date.");
+        }
+        if (parsed.modeWarning) {
+          notes.push("Parsed, but this may be the wrong mode. Review FUD vs Guardian.");
+        }
+        setStatus(notes.length ? notes.join(" ") : "Tweet parsed with high confidence. Review and save.", notes.length > 0);
       } finally {
         parseButton.disabled = false;
       }
