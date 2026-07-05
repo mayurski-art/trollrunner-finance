@@ -352,6 +352,22 @@ textarea:focus {
       };
     }
 
+    // Writes to site_updates now require a real admin session -- see
+    // assets/supabase/troll_admin_lockdown.sql on the main site repo.
+    async function adminRpcHeaders() {
+      const headers = {
+        apikey: SUPABASE_ANON_KEY,
+        "Content-Type": "application/json",
+      };
+      try {
+        const token = await window.TrollrunnerAdminAuth?.getAccessToken?.();
+        headers.Authorization = `Bearer ${token || SUPABASE_ANON_KEY}`;
+      } catch {
+        headers.Authorization = `Bearer ${SUPABASE_ANON_KEY}`;
+      }
+      return headers;
+    }
+
     function escapeHtml(value) {
       return String(value || "").replace(/[&<>"']/g, (ch) => ({
         "&": "&amp;",
@@ -1336,15 +1352,10 @@ textarea:focus {
     async function saveTimelineToBackend(items) {
       if (!isSupabaseConfigured()) return false;
       try {
-        const payload = [{
-          id: SUPABASE_ROW_ID,
-          updates: items,
-          updated_at: new Date().toISOString(),
-        }];
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`, {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/troll_admin_replace_site_row`, {
           method: "POST",
-          headers: supabaseHeaders("resolution=merge-duplicates,return=minimal"),
-          body: JSON.stringify(payload),
+          headers: await adminRpcHeaders(),
+          body: JSON.stringify({ p_updates: items, p_row_id: SUPABASE_ROW_ID }),
         });
         return response.ok;
       } catch (error) {
@@ -1515,5 +1526,17 @@ textarea:focus {
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/js/site-lock.js"></script>
   <script src="assets/js/admin-auth.js"></script>
+  <script>
+    (async () => {
+      const helper = window.TrollrunnerAdminAuth;
+      const authed = helper?.hasAdminSession ? await helper.hasAdminSession() : false;
+      if (!authed) {
+        localStorage.removeItem(AUTH_KEY);
+        window.location.href = "index.html";
+        return;
+      }
+      localStorage.setItem(AUTH_KEY, "1");
+    })();
+  </script>
 </body>
 </html>

@@ -2091,19 +2091,7 @@ h1 {
         sourceHref: "https://x.com/ProTheDoge/status/2052501165498097922",
       },
     ];
-    const ADMIN_PASSWORD_SALT = "trollrunner-public-lock-v2";
-    const ADMIN_PASSWORD_HASH = "f7bd3dc03b760781a16bcafb96650c619632b1610903352272804046815b6f8d";
     const ADMIN_AUTH_KEY = "trollrunner_finance_admin_auth";
-
-    async function hashAdminText(value) {
-      const bytes = new TextEncoder().encode(String(value || ""));
-      const hashBuffer = await window.crypto.subtle.digest("SHA-256", bytes);
-      return Array.from(new Uint8Array(hashBuffer)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
-    }
-
-    async function verifyAdminPassword(password) {
-      return await hashAdminText(ADMIN_PASSWORD_SALT + ':' + password) === ADMIN_PASSWORD_HASH;
-    }
     const SUPABASE_URL = "https://tjsyhfplxjtakdfkpdtg.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqc3loZnBseGp0YWtkZmtwZHRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzOTc0ODksImV4cCI6MjA5MTk3MzQ4OX0.xLUcPUUguRBQttNwiIRWJHxjJjLqrQDMu4Ubsk5yZoQ";
     const SUPABASE_ANON_KEY_PLACEHOLDER = "your_anon_public_key";
@@ -2462,7 +2450,12 @@ h1 {
     async function goToFinanceAdmin() {
       const input = document.getElementById("admin-pass");
       const pass = input ? input.value : "";
-      if (!(await verifyAdminPassword(pass))) {
+      try {
+        // Real Supabase Auth login (see assets/supabase/troll_admin_lockdown.sql
+        // on the main site repo) -- this is what the server actually checks now,
+        // not the localStorage flag below.
+        await window.TrollrunnerAdminAuth.signInWithAdminPassword(pass, { silent: true });
+      } catch (error) {
         goToFinanceAdmin.failedAttempts = (goToFinanceAdmin.failedAttempts || 0) + 1;
         const idx = Math.min(goToFinanceAdmin.failedAttempts - 1, ADMIN_PASSWORD_TROLL_MESSAGES.length - 1);
         window.alert(ADMIN_PASSWORD_TROLL_MESSAGES[idx]);
