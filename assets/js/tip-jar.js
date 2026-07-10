@@ -38,6 +38,9 @@
     window.TrollPay.mountTokenPicker($('tip-token-picker'), function () {
       sendBtn.textContent = sendLabel();
     });
+    // If Phantom already trusts this origin (connected here before, or via
+    // the main site's header), this resolves silently — no popup either way.
+    if (window.TrollPay.warmConnect) void window.TrollPay.warmConnect();
     if (window.TrollPay.config && window.TrollPay.config.DEVNET_MODE && netNote) {
       netNote.textContent = 'Test mode — devnet (fake USDC).';
     }
@@ -101,6 +104,13 @@
 
     sendBtn.addEventListener('click', async function () {
       if (!(selectedUsd > 0)) { statusEl.textContent = 'Enter an amount.'; return; }
+
+      // One extra tap before any wallet interaction — catches misclicks on the
+      // amount buttons before real money moves. Phantom's own approval screen
+      // still shows after this; that step can't be skipped (nor should it).
+      var confirmLabel = window.TrollPay.getToken() === 'TROLL'
+        ? '$' + selectedUsd.toFixed(2) + ' in $TROLL' : selectedUsd.toFixed(2) + ' USDC';
+      if (!window.confirm('Send ' + confirmLabel + ' to the Troll Fund treasury?\n\nThis is a real crypto payment.')) return;
 
       // Phone with no injected wallet → hand off to the Phantom app via Solana Pay.
       // Don't commit the coin until the user returns; the transaction log will catch it.
