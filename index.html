@@ -1522,6 +1522,12 @@ h1 {
   width: 110px; border: 1px solid var(--line); background: #030603; color: var(--text);
   border-radius: 8px; padding: 9px 12px; font-family: inherit; font-size: 14px;
 }
+.tip-wallet-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 10px; }
+.tip-wallet-btn { border: 1px solid var(--line); background: var(--panel-soft); color: var(--text); border-radius: 6px;
+  padding: 6px 12px; font-family: inherit; font-size: 12px; cursor: pointer; }
+.tip-wallet-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.tip-wallet-btn:disabled { opacity: 0.6; cursor: progress; }
+.tip-wallet-balances { color: var(--muted); font-size: 12px; }
 .tip-token-picker { display: flex; gap: 6px; align-items: center; margin: 0 0 12px; }
 .pay-token-static { color: var(--muted); font-size: 12px; }
 .pay-token-btn { border: 1px solid var(--line); background: var(--panel-soft); color: var(--muted); border-radius: 6px; padding: 4px 10px; font-family: inherit; font-size: 12px; cursor: pointer; }
@@ -1644,6 +1650,10 @@ h1 {
             <button class="tip-amt is-active" data-usd="4.20" type="button">$4.20</button>
             <button class="tip-amt" data-usd="6.90" type="button">$6.90</button>
             <input class="tip-amt-custom" id="tip-amt-custom" type="number" min="0.01" step="0.01" placeholder="Custom $" inputmode="decimal" aria-label="Custom tip amount in USD">
+          </div>
+          <div class="tip-wallet-row" id="tip-wallet-row">
+            <button type="button" class="tip-wallet-btn" id="tip-wallet-btn">👛 Connect Wallet</button>
+            <span class="tip-wallet-balances" id="tip-wallet-balances"></span>
           </div>
           <span id="tip-token-picker" class="tip-token-picker"></span>
           <button class="tip-send-btn" id="tip-send-btn" type="button">Tip 4.20 USDC</button>

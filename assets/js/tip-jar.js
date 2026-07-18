@@ -38,12 +38,41 @@
     window.TrollPay.mountTokenPicker($('tip-token-picker'), function () {
       sendBtn.textContent = sendLabel();
     });
-    // If Phantom already trusts this origin (connected here before, or via
-    // the main site's header), this resolves silently — no popup either way.
-    if (window.TrollPay.warmConnect) void window.TrollPay.warmConnect();
     if (window.TrollPay.config && window.TrollPay.config.DEVNET_MODE && netNote) {
       netNote.textContent = 'Test mode — devnet (fake USDC).';
     }
+
+    // Wallet chip: shows the connected address + what it actually holds, so a
+    // visitor can see their $TROLL/USDC before deciding whether/how much to tip.
+    var walletBtn = $('tip-wallet-btn');
+    var walletBalEl = $('tip-wallet-balances');
+    function renderWalletStatus() {
+      if (!walletBtn) return;
+      var w = window.TrollPay.getWallet();
+      if (!w || !w.address) { walletBtn.textContent = '👛 Connect Wallet'; if (walletBalEl) walletBalEl.textContent = ''; return; }
+      walletBtn.textContent = '👛 ' + w.address.slice(0, 4) + '…' + w.address.slice(-4);
+      if (!walletBalEl || !window.TrollPay.getBalances) return;
+      walletBalEl.textContent = 'Loading balances…';
+      window.TrollPay.getBalances(w.address).then(function (bal) {
+        var parts = [];
+        if (bal.troll != null) parts.push(bal.troll.toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' $TROLL');
+        if (bal.usdc != null) parts.push(bal.usdc.toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' USDC');
+        walletBalEl.textContent = parts.join(' · ');
+      });
+    }
+    if (walletBtn) {
+      walletBtn.addEventListener('click', async function () {
+        if (window.TrollPay.isConnected()) return; // already connected — nothing more to do from here
+        walletBtn.disabled = true; walletBtn.textContent = 'Connecting…';
+        try { await window.TrollPay.connect(); }
+        catch (e) { walletBtn.textContent = '👛 Connect Wallet'; if (walletBalEl) walletBalEl.textContent = '⚠ ' + ((e && e.message) || 'Could not connect'); }
+        walletBtn.disabled = false;
+        renderWalletStatus();
+      });
+    }
+    // If Phantom already trusts this origin (connected here before, or via
+    // the main site's header), this resolves silently — no popup either way.
+    if (window.TrollPay.warmConnect) void window.TrollPay.warmConnect().then(renderWalletStatus);
 
     function placeRestingCoin(i) {
       var c = document.createElement('div');
@@ -148,6 +177,7 @@
 
       sendBtn.disabled = false;
       sendBtn.textContent = orig;
+      renderWalletStatus(); // pay() connects the wallet if it wasn't already — reflect that + the new balance
       if (!res.ok) { statusEl.textContent = '⚠ ' + res.reason; return; }
       dropCoin();
       var url = window.TrollPay.explorerUrl(res.txSig);
@@ -156,6 +186,7 @@
 
     setSelected(selectedUsd, false);
     renderPile();
+    renderWalletStatus();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
