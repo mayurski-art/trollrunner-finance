@@ -33,20 +33,6 @@ body {
     linear-gradient(180deg, #070b08, #030503 55%);
 }
 
-.scanlines::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(126, 255, 142, 0.025) 0px,
-    rgba(126, 255, 142, 0.025) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-}
-
 .wrap {
   max-width: 1040px;
   margin: 0 auto;
@@ -1549,7 +1535,7 @@ h1 {
 }
 </style>
 </head>
-<body class="scanlines">
+<body>
   <div class="wrap">
     <div class="top">
       <strong class="brand">💰 TROLLRUNNER.FINANCE</strong>
