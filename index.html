@@ -1530,6 +1530,76 @@ h1 {
 .tip-status { margin: 10px 0 0; font-size: 13px; min-height: 18px; color: var(--accent); }
 .tip-status a { color: var(--accent); }
 .tip-fine { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+
+/* ── Money Flow donut ─────────────────────────────────────────── */
+.money-flow-grid {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.money-flow-donut {
+  position: relative;
+  flex: 0 0 auto;
+  width: 230px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+.money-flow-donut svg { display: block; width: 100%; height: auto; overflow: visible; }
+.money-flow-slice {
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  outline: none;
+  stroke: var(--panel);   /* 2px surface gap between slices */
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.money-flow-slice:focus-visible { stroke: var(--accent); }
+.money-flow.has-hot .money-flow-slice { opacity: 0.35; }
+.money-flow.has-hot .money-flow-slice.is-hot { opacity: 1; }
+.money-flow-total { fill: var(--text); font-size: 24px; font-weight: 700; }
+.money-flow-caption { fill: var(--muted); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+.money-flow-tip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 8px));
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #030603;
+  color: var(--text);
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+.money-flow-legend {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  align-content: center;
+}
+.money-flow-row {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-soft);
+  transition: background 0.15s ease;
+}
+.money-flow-row.is-hot { background: var(--accent-soft); }
+.money-flow-swatch { width: 14px; height: 14px; border-radius: 4px; }
+.money-flow-name { font-size: 13px; }
+.money-flow-usd { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.money-flow-pct { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.money-flow-fine { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.money-flow-empty { color: var(--muted); font-size: 13px; padding: 18px 0; }
+
 @media (prefers-reduced-motion: reduce) {
   .tip-jar-glass, .tip-coin.dropping { animation: none !important; }
 }
@@ -1661,6 +1731,23 @@ h1 {
       <div id="transfer-list" class="transfer-list">
         <div class="transfer-item">Loading on-chain transactions…</div>
       </div>
+    </section>
+
+    <section class="card money-flow" id="money-flow" style="margin-top: 14px;" aria-labelledby="money-flow-heading">
+      <div class="transfers-header">
+        <h3 id="money-flow-heading">Money Flow</h3>
+        <span id="money-flow-status" class="transfers-note">Scanning treasury history…</span>
+      </div>
+      <div class="money-flow-grid">
+        <div class="money-flow-donut" id="money-flow-donut">
+          <div class="money-flow-empty">Crunching on-chain transfers…</div>
+        </div>
+        <div class="money-flow-legend" id="money-flow-legend" role="list" aria-label="Revenue allocation"></div>
+      </div>
+      <p class="money-flow-fine">Computed live from the Troll Fund wallet's recent USDC + $TROLL transfers.
+        Money in = revenue. Money out counts as a giveaway when the on-chain memo says so
+        (casino payouts, <code>TR|giveaway</code>) — every other outflow is marketing &amp; ops.
+        USD values use current prices.</p>
     </section>
 
     <section class="death-ledger" aria-labelledby="trolldeaths-heading">
@@ -1795,6 +1882,12 @@ h1 {
     const MAX_TRANSFER_ITEMS = 12;
     const MAX_SIGNATURE_SCAN = 250;
     const MEMO_PROGRAM_ID = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr";
+    // Money Flow donut: how far back to scan each token account, and how often
+    // to refresh. Parsed rows are cached in localStorage so only new
+    // transactions cost RPC calls after the first visit.
+    const FLOW_SIGNATURE_LIMIT = 60;
+    const FLOW_POLL_MS = 60 * 1000;
+    const FLOW_CACHE_KEY = "troll_money_flow_rows_v1";
     const BALANCE_CACHE_KEY = "troll_stats_cache_v1";
     const CACHE_TTL_MS = 2 * 60 * 1000;
     const STALE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -2483,9 +2576,16 @@ h1 {
       return prices;
     }
 
-    async function rpcRequest(method, params) {
+    // A stalled (not erroring, just never resolving) fetch to either public
+    // RPC used to hang this — and everything downstream of it, including
+    // getTreasuryAtas() and the Money Flow scan — forever. Every endpoint
+    // attempt now carries its own abort timeout, same pattern as
+    // getTrollBalanceFromEndpoint below.
+    async function rpcRequest(method, params, timeoutMs = 8000) {
       let lastError;
       for (const endpoint of SOLANA_RPC_ENDPOINTS) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
         try {
           const res = await fetch(endpoint, {
             method: "POST",
@@ -2496,6 +2596,7 @@ h1 {
               method,
               params
             }),
+            signal: controller.signal,
           });
           if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
           const json = await res.json();
@@ -2503,6 +2604,8 @@ h1 {
           return json.result;
         } catch (err) {
           lastError = err;
+        } finally {
+          clearTimeout(timeoutId);
         }
       }
       throw lastError || new Error(`Unable to run RPC method ${method}`);
@@ -2889,6 +2992,270 @@ h1 {
           </article>
         `;
       }).join("");
+    }
+
+    // ── Money Flow donut ─────────────────────────────────────────────────────
+    // Same treasury ATAs as the donor feed, but both directions kept:
+    // money in = revenue; money out is classified by its "TR|<category>|" memo
+    // (casino payouts / TR|giveaway → giveaways, everything else → marketing).
+    // The donut shows how revenue splits: kept vs given away vs spent.
+    const FLOW_BUCKETS = [
+      { key: "kept",      label: "Kept in treasury", color: "#008300" },
+      { key: "giveaway",  label: "Giveaways",        color: "#3987e5" },
+      { key: "marketing", label: "Marketing & ops",  color: "#d55181" },
+    ];
+    const GIVEAWAY_MEMO_TAGS = ["casino_payout", "giveaway", "payout", "prize", "airdrop"];
+
+    const flowBySig = new Map();   // signature -> flow row | null (parse cache)
+    (function hydrateFlowCache() {
+      try {
+        for (const [sig, row] of JSON.parse(localStorage.getItem(FLOW_CACHE_KEY) || "[]")) {
+          flowBySig.set(sig, row);
+        }
+      } catch (err) { /* cold cache */ }
+    })();
+    function persistFlowCache() {
+      try {
+        localStorage.setItem(FLOW_CACHE_KEY, JSON.stringify([...flowBySig.entries()].slice(-400)));
+      } catch (err) { /* storage blocked or full — cache is an optimization only */ }
+    }
+
+    function flowBucketFor(memo, delta) {
+      if (delta > 0) return "revenue";
+      const tag = String(memo || "").toLowerCase();
+      if (tag.indexOf("tr|") === 0 && GIVEAWAY_MEMO_TAGS.includes(tag.split("|")[1])) return "giveaway";
+      return "marketing";
+    }
+
+    // The flow scan needs FULL history, and PublicNode silently truncates old
+    // signatures (it returned 0–1 sigs where the Foundation RPC returned the
+    // real 4–7), so this scan runs its own endpoint order with hard timeouts
+    // and merges the signature lists from every endpoint that answers.
+    const FLOW_RPC_ENDPOINTS = [
+      "https://api.mainnet-beta.solana.com",
+      "https://solana-rpc.publicnode.com",
+    ];
+    async function flowRpc(endpoint, method, params, timeoutMs = 12000) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+          signal: ctrl.signal,
+        });
+        if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
+        const json = await res.json();
+        if (json?.error) throw new Error(`${endpoint} RPC error: ${json.error.message || "unknown"}`);
+        return json.result;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    async function flowSignatures(ata) {
+      const results = await Promise.allSettled(FLOW_RPC_ENDPOINTS.map((ep) =>
+        flowRpc(ep, "getSignaturesForAddress", [ata, { limit: FLOW_SIGNATURE_LIMIT }])));
+      const bySig = new Map();
+      let anyOk = false;
+      for (const r of results) {
+        if (r.status !== "fulfilled" || !Array.isArray(r.value)) continue;
+        anyOk = true;
+        for (const s of r.value) if (s?.signature && !bySig.has(s.signature)) bySig.set(s.signature, s);
+      }
+      if (!anyOk) throw new Error("Could not list treasury history");
+      return [...bySig.values()];
+    }
+    // Endpoints can also answer "ok but not found" for transactions outside
+    // their retention window — only a null from EVERY endpoint means gone.
+    async function flowTransaction(signature) {
+      let sawOk = false, lastErr;
+      for (const endpoint of FLOW_RPC_ENDPOINTS) {
+        try {
+          const tx = await flowRpc(endpoint, "getTransaction", [
+            signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }
+          ]);
+          if (tx) return tx;
+          sawOk = true;
+        } catch (err) { lastErr = err; }
+      }
+      if (sawOk) return null;
+      throw lastErr || new Error("transaction fetch failed");
+    }
+
+    async function getMoneyFlow() {
+      const atas = await getTreasuryAtas();
+      const candidates = [];
+      let anySigOk = false;
+      for (const token of DONATION_TOKENS) {
+        const ata = atas[token.mint];
+        if (!ata) continue;
+        try {
+          for (const s of await flowSignatures(ata)) candidates.push({ token, sig: s });
+          anySigOk = true;
+        } catch (err) { /* try the other token */ }
+      }
+      if (!anySigOk) throw new Error("Could not list treasury history");
+
+      const toFetch = candidates.filter((c) => !flowBySig.has(c.sig.signature));
+      await runWithConcurrency(toFetch, 4, async (c) => {
+        let tx;
+        try {
+          tx = await flowTransaction(c.sig.signature);
+        } catch (err) { return; }                          // leave uncached → retry next poll
+        if (!tx) { flowBySig.set(c.sig.signature, null); return; }   // pruned everywhere
+        if (!tx.meta || tx.meta.err) { flowBySig.set(c.sig.signature, null); return; }
+        const delta = incomingDelta(tx.meta, c.token.mint);
+        if (!delta) { flowBySig.set(c.sig.signature, null); return; }
+        flowBySig.set(c.sig.signature, {
+          amount: delta,                                   // negative = outflow
+          symbol: c.token.symbol,
+          blockTime: c.sig.blockTime || tx.blockTime || null,
+          bucket: flowBucketFor(extractMemo(tx), delta),
+        });
+      });
+      if (toFetch.length) persistFlowCache();
+
+      const rows = [];
+      const seen = new Set();
+      for (const c of candidates) {
+        if (seen.has(c.sig.signature)) continue;
+        seen.add(c.sig.signature);
+        const row = flowBySig.get(c.sig.signature);
+        if (row) rows.push(row);
+      }
+      return rows;
+    }
+
+    // One ring segment as an SVG path (donut slice). Angles in radians.
+    function donutSlicePath(cx, cy, rOuter, rInner, start, end) {
+      const large = end - start > Math.PI ? 1 : 0;
+      const pt = (r, a) => `${(cx + r * Math.cos(a)).toFixed(2)} ${(cy + r * Math.sin(a)).toFixed(2)}`;
+      return `M ${pt(rOuter, start)} A ${rOuter} ${rOuter} 0 ${large} 1 ${pt(rOuter, end)} ` +
+             `L ${pt(rInner, end)} A ${rInner} ${rInner} 0 ${large} 0 ${pt(rInner, start)} Z`;
+    }
+
+    function fmtPct(fraction) {
+      const pct = fraction * 100;
+      return `${pct >= 9.95 ? Math.round(pct) : pct.toFixed(1)}%`;
+    }
+
+    function renderMoneyFlow(rows) {
+      const donutEl = document.getElementById("money-flow-donut");
+      const legendEl = document.getElementById("money-flow-legend");
+      const statusEl = document.getElementById("money-flow-status");
+      const sectionEl = document.getElementById("money-flow");
+      if (!donutEl || !legendEl || !statusEl || !sectionEl) return;
+
+      let revenue = 0, oldest = null, unpriced = false;
+      const spent = { giveaway: 0, marketing: 0 };
+      for (const row of rows) {
+        const usd = donationUsd(row);
+        if (usd === null) { unpriced = true; continue; }   // TROLL rows before price loads
+        if (row.blockTime && (!oldest || row.blockTime < oldest)) oldest = row.blockTime;
+        if (row.bucket === "revenue") revenue += usd;
+        else spent[row.bucket] += -usd;
+      }
+      const kept = Math.max(0, revenue - spent.giveaway - spent.marketing);
+      const totals = { kept, giveaway: spent.giveaway, marketing: spent.marketing };
+      const total = totals.kept + totals.giveaway + totals.marketing;
+
+      if (!total) {
+        statusEl.textContent = unpriced ? "Waiting on $TROLL price data…" : "No priced transfers in the scan window yet.";
+        donutEl.innerHTML = "<div class='money-flow-empty'>Nothing to slice yet — the pie appears once transfers land.</div>";
+        legendEl.innerHTML = "";
+        return;
+      }
+
+      const sinceLabel = oldest ? ` · since ${fmtCompactDate(oldest * 1000)}` : "";
+      statusEl.textContent =
+        `${rows.length} transfers scanned${sinceLabel}${unpriced ? " · some $TROLL rows await price" : ""} · updated ${new Date().toLocaleTimeString()}`;
+
+      // Donut geometry: 240×240 viewBox, ring from r74 to r108, 12 o'clock start.
+      const cx = 120, cy = 120, rOuter = 108, rInner = 74;
+      let angle = -Math.PI / 2;
+      const slices = FLOW_BUCKETS.map((bucket) => {
+        const value = totals[bucket.key];
+        const fraction = value / total;
+        const slice = { ...bucket, value, fraction, start: angle, end: angle + fraction * 2 * Math.PI };
+        angle = slice.end;
+        return slice;
+      });
+
+      const drawn = slices.filter((s) => s.fraction >= 0.004);
+      const paths = drawn.map((s) => {
+        const label = `${s.label}: $${fmtUsd(s.value)} (${fmtPct(s.fraction)})`;
+        // A ~100% slice degenerates as a single arc — draw it as two half rings.
+        const d = s.fraction >= 0.9995
+          ? donutSlicePath(cx, cy, rOuter, rInner, s.start, s.start + Math.PI) + " " +
+            donutSlicePath(cx, cy, rOuter, rInner, s.start + Math.PI, s.start + 2 * Math.PI)
+          : donutSlicePath(cx, cy, rOuter, rInner, s.start, s.end);
+        return `<path class="money-flow-slice" data-bucket="${s.key}" d="${d}" fill="${s.color}"
+          tabindex="0" role="img" aria-label="${escapeHtml(label)}"></path>`;
+      }).join("");
+
+      donutEl.innerHTML = `
+        <svg viewBox="0 0 240 240" aria-hidden="false">
+          ${paths}
+          <text class="money-flow-total" x="120" y="116" text-anchor="middle">$${fmtUsd(revenue)}</text>
+          <text class="money-flow-caption" x="120" y="136" text-anchor="middle">revenue in</text>
+        </svg>`;
+
+      legendEl.innerHTML = slices.map((s) => `
+        <div class="money-flow-row" role="listitem" data-bucket="${s.key}">
+          <span class="money-flow-swatch" style="background:${s.color}" aria-hidden="true"></span>
+          <span class="money-flow-name">${s.label}</span>
+          <span class="money-flow-usd">$${fmtUsd(s.value)}</span>
+          <span class="money-flow-pct">${fmtPct(s.fraction)}</span>
+        </div>`).join("");
+
+      // Hover/focus: highlight the slice + its legend row, show a tooltip at the
+      // slice's mid-angle. Legend rows highlight their slice too.
+      const tipEl = document.createElement("div");
+      tipEl.className = "money-flow-tip";
+      tipEl.hidden = true;
+      donutEl.appendChild(tipEl);
+      const sliceByKey = {};
+      const setHot = (key) => {
+        sectionEl.classList.toggle("has-hot", Boolean(key));
+        donutEl.querySelectorAll(".money-flow-slice").forEach((el) =>
+          el.classList.toggle("is-hot", el.dataset.bucket === key));
+        legendEl.querySelectorAll(".money-flow-row").forEach((el) =>
+          el.classList.toggle("is-hot", el.dataset.bucket === key));
+        const slice = key && sliceByKey[key];
+        if (!slice) { tipEl.hidden = true; return; }
+        const mid = (slice.start + slice.end) / 2;
+        const rMid = (rOuter + rInner) / 2;
+        tipEl.textContent = `${slice.label} · $${fmtUsd(slice.value)} · ${fmtPct(slice.fraction)}`;
+        tipEl.style.left = `${((cx + rMid * Math.cos(mid)) / 240) * 100}%`;
+        tipEl.style.top = `${((cy + rMid * Math.sin(mid)) / 240) * 100}%`;
+        tipEl.hidden = false;
+      };
+      for (const s of drawn) sliceByKey[s.key] = s;
+      donutEl.querySelectorAll(".money-flow-slice").forEach((el) => {
+        el.addEventListener("mouseenter", () => setHot(el.dataset.bucket));
+        el.addEventListener("mouseleave", () => setHot(null));
+        el.addEventListener("focus", () => setHot(el.dataset.bucket));
+        el.addEventListener("blur", () => setHot(null));
+      });
+      legendEl.querySelectorAll(".money-flow-row").forEach((el) => {
+        el.addEventListener("mouseenter", () => setHot(el.dataset.bucket));
+        el.addEventListener("mouseleave", () => setHot(null));
+      });
+    }
+
+    let moneyFlowLoading = false;
+    async function loadMoneyFlow() {
+      if (moneyFlowLoading) return;    // first scan can outlast the poll interval
+      moneyFlowLoading = true;
+      try {
+        renderMoneyFlow(await getMoneyFlow());
+      } catch (err) {
+        const statusEl = document.getElementById("money-flow-status");
+        if (statusEl) statusEl.textContent = "Money flow unavailable right now.";
+      } finally {
+        moneyFlowLoading = false;
+      }
     }
 
     function fmtCompactDate(timestamp) {
@@ -3489,7 +3856,10 @@ h1 {
     Promise.allSettled([loadTrollStats(), loadTransfers()]).then(() => {
       // If price resolved after transfers rendered, refresh USD estimations.
       if (latestTrollUsd) loadTransfers();
+      // Money Flow waits for the price fetch so $TROLL rows get USD values.
+      loadMoneyFlow();
     });
+    window.setInterval(loadMoneyFlow, FLOW_POLL_MS);
     // Transaction-log category filter buttons.
     document.querySelectorAll(".txn-filter").forEach((btn) => {
       btn.addEventListener("click", () => {
