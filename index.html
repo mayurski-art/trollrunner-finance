@@ -1888,6 +1888,10 @@ h1 {
     const FLOW_SIGNATURE_LIMIT = 60;
     const FLOW_POLL_MS = 60 * 1000;
     const FLOW_CACHE_KEY = "troll_money_flow_rows_v1";
+    // Last-rendered Transaction Log rows, so a reload paints instantly from
+    // what was already seen instead of sitting on "Loading…" for a fresh
+    // RPC scan every time.
+    const TRANSFER_ROWS_CACHE_KEY = "troll_transfer_rows_cache_v1";
     const BALANCE_CACHE_KEY = "troll_stats_cache_v1";
     const CACHE_TTL_MS = 2 * 60 * 1000;
     const STALE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -2947,6 +2951,22 @@ h1 {
       return null;
     }
 
+    function readTransferRowsCache() {
+      try {
+        const raw = localStorage.getItem(TRANSFER_ROWS_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed?.rows) && parsed.rows.length ? parsed.rows : null;
+      } catch (err) {
+        return null;
+      }
+    }
+    function writeTransferRowsCache(rows) {
+      try {
+        localStorage.setItem(TRANSFER_ROWS_CACHE_KEY, JSON.stringify({ rows, timestamp: Date.now() }));
+      } catch (err) { /* storage blocked or full — cache is an optimization only */ }
+    }
+
     let transferFilter = "all";   // all | tip | game
 
     function renderTransfers(rows) {
@@ -3018,6 +3038,12 @@ h1 {
       try {
         localStorage.setItem(FLOW_CACHE_KEY, JSON.stringify([...flowBySig.entries()].slice(-400)));
       } catch (err) { /* storage blocked or full — cache is an optimization only */ }
+    }
+    // Every row this browser has ever successfully parsed, from the persisted
+    // cache — used to paint the donut immediately on load, before any new
+    // network round trip.
+    function cachedFlowRows() {
+      return [...flowBySig.values()].filter(Boolean);
     }
 
     // Only outflows reach this — "kept in treasury" comes from the current
@@ -3263,14 +3289,29 @@ h1 {
     }
 
     let moneyFlowLoading = false;
+    let moneyFlowRendered = false;
+    // Paint instantly from whatever this browser has already seen — the
+    // per-signature parse cache persists across reloads (see
+    // hydrateFlowCache above), so a returning visitor isn't stuck on
+    // "Scanning treasury history…" while a fresh RPC round trip runs.
+    function hydrateMoneyFlowDisplay() {
+      if (currentTreasuryUsd() === null) return;
+      renderMoneyFlow(cachedFlowRows());
+      moneyFlowRendered = true;
+    }
     async function loadMoneyFlow() {
       if (moneyFlowLoading) return;    // first scan can outlast the poll interval
       moneyFlowLoading = true;
       try {
         renderMoneyFlow(await getMoneyFlow());
+        moneyFlowRendered = true;
       } catch (err) {
-        const statusEl = document.getElementById("money-flow-status");
-        if (statusEl) statusEl.textContent = "Money flow unavailable right now.";
+        // Live refresh failed — leave the last good render (cached or prior
+        // fetch) on screen rather than blanking it to an error message.
+        if (!moneyFlowRendered) {
+          const statusEl = document.getElementById("money-flow-status");
+          if (statusEl) statusEl.textContent = "Money flow unavailable right now.";
+        }
       } finally {
         moneyFlowLoading = false;
       }
@@ -3722,14 +3763,27 @@ h1 {
     }
 
     let donationsRendered = false;
+    // Paint instantly from the last successful render (saved to localStorage
+    // below) instead of sitting on "Loading on-chain transactions…" while a
+    // fresh RPC scan runs — a returning visitor sees their data immediately.
+    function hydrateTransfersDisplay() {
+      const cached = readTransferRowsCache();
+      if (!cached) return;
+      cachedTransfers = cached;
+      renderTransfers(cachedTransfers);
+      donationsRendered = true;
+    }
     async function loadTransfers() {
       const transferStatusEl = document.getElementById("transfer-status");
       try {
         cachedTransfers = await getRecentDonations();
         renderTransfers(cachedTransfers);
         donationsRendered = true;
+        writeTransferRowsCache(cachedTransfers);
       } catch (err) {
         console.error("Unable to load transaction log", err);
+        // Live refresh failed — leave the last good render (cached or prior
+        // fetch) on screen rather than blanking it to an error message.
         if (!donationsRendered) {
           transferStatusEl.textContent = "Transaction log unavailable right now.";
           document.getElementById("transfer-list").innerHTML = "<div class='transfer-item'>Could not fetch transactions from Solana RPC.</div>";
@@ -3853,6 +3907,11 @@ h1 {
     loadTrollChart(DEFAULT_CHART_RANGE);
     setupWalletCopyButton();
     applyCachedStats();
+    // Instant paint from whatever's in localStorage — no network wait — for
+    // both the Transaction Logs and Money Flow sections, before any of the
+    // live RPC scans below even start.
+    hydrateTransfersDisplay();
+    hydrateMoneyFlowDisplay();
 
     Promise.allSettled([
       loadFinanceTimelineFromJson(),
