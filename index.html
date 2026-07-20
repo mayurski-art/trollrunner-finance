@@ -1744,8 +1744,8 @@ h1 {
         </div>
         <div class="money-flow-legend" id="money-flow-legend" role="list" aria-label="Revenue allocation"></div>
       </div>
-      <p class="money-flow-fine">Computed live from the Troll Fund wallet's recent USDC + $TROLL transfers.
-        Money in = revenue. Money out counts as a giveaway when the on-chain memo says so
+      <p class="money-flow-fine">"Kept in treasury" is the Troll Fund wallet's current USDC + $TROLL balance.
+        Money out counts as a giveaway when the on-chain memo says so
         (casino payouts, <code>TR|giveaway</code>) — every other outflow is marketing &amp; ops.
         USD values use current prices.</p>
     </section>
@@ -3020,8 +3020,9 @@ h1 {
       } catch (err) { /* storage blocked or full — cache is an optimization only */ }
     }
 
-    function flowBucketFor(memo, delta) {
-      if (delta > 0) return "revenue";
+    // Only outflows reach this — "kept in treasury" comes from the current
+    // wallet balance instead (see renderMoneyFlow), not a summed inflow scan.
+    function flowBucketFor(memo) {
       const tag = String(memo || "").toLowerCase();
       if (tag.indexOf("tr|") === 0 && GIVEAWAY_MEMO_TAGS.includes(tag.split("|")[1])) return "giveaway";
       return "marketing";
@@ -3106,12 +3107,12 @@ h1 {
         if (!tx) { flowBySig.set(c.sig.signature, null); return; }   // pruned everywhere
         if (!tx.meta || tx.meta.err) { flowBySig.set(c.sig.signature, null); return; }
         const delta = incomingDelta(tx.meta, c.token.mint);
-        if (!delta) { flowBySig.set(c.sig.signature, null); return; }
+        if (delta >= 0) { flowBySig.set(c.sig.signature, null); return; }   // only outflows count here
         flowBySig.set(c.sig.signature, {
-          amount: delta,                                   // negative = outflow
+          amount: delta,                                   // always negative
           symbol: c.token.symbol,
           blockTime: c.sig.blockTime || tx.blockTime || null,
-          bucket: flowBucketFor(extractMemo(tx), delta),
+          bucket: flowBucketFor(extractMemo(tx)),
         });
       });
       if (toFetch.length) persistFlowCache();
@@ -3140,6 +3141,17 @@ h1 {
       return `${pct >= 9.95 ? Math.round(pct) : pct.toFixed(1)}%`;
     }
 
+    // "Kept in treasury" uses the wallet's CURRENT balance (same numbers as
+    // the hero stat tiles) rather than summing all-time inbound transfers —
+    // inbound history is thin/unreliable on the free RPCs, but the current
+    // balance is already fetched reliably by loadTrollStats(). Only the
+    // giveaway/marketing split still comes from the recent outflow scan.
+    function currentTreasuryUsd() {
+      const cached = readStatsCache();
+      if (!cached || typeof cached.usdValue !== "number") return null;
+      return cached.usdValue + (Number(cached.usdcBalance) || 0);
+    }
+
     function renderMoneyFlow(rows) {
       const donutEl = document.getElementById("money-flow-donut");
       const legendEl = document.getElementById("money-flow-legend");
@@ -3147,29 +3159,35 @@ h1 {
       const sectionEl = document.getElementById("money-flow");
       if (!donutEl || !legendEl || !statusEl || !sectionEl) return;
 
-      let revenue = 0, oldest = null, unpriced = false;
+      const kept = currentTreasuryUsd();
+      if (kept === null) {
+        statusEl.textContent = "Waiting on wallet balance…";
+        donutEl.innerHTML = "<div class='money-flow-empty'>Nothing to slice yet — waiting on the treasury balance.</div>";
+        legendEl.innerHTML = "";
+        return;
+      }
+
+      let oldest = null, unpriced = false;
       const spent = { giveaway: 0, marketing: 0 };
       for (const row of rows) {
         const usd = donationUsd(row);
         if (usd === null) { unpriced = true; continue; }   // TROLL rows before price loads
         if (row.blockTime && (!oldest || row.blockTime < oldest)) oldest = row.blockTime;
-        if (row.bucket === "revenue") revenue += usd;
-        else spent[row.bucket] += -usd;
+        spent[row.bucket] += -usd;
       }
-      const kept = Math.max(0, revenue - spent.giveaway - spent.marketing);
       const totals = { kept, giveaway: spent.giveaway, marketing: spent.marketing };
       const total = totals.kept + totals.giveaway + totals.marketing;
 
       if (!total) {
-        statusEl.textContent = unpriced ? "Waiting on $TROLL price data…" : "No priced transfers in the scan window yet.";
-        donutEl.innerHTML = "<div class='money-flow-empty'>Nothing to slice yet — the pie appears once transfers land.</div>";
+        statusEl.textContent = unpriced ? "Waiting on $TROLL price data…" : "Nothing to show yet.";
+        donutEl.innerHTML = "<div class='money-flow-empty'>Nothing to slice yet.</div>";
         legendEl.innerHTML = "";
         return;
       }
 
-      const sinceLabel = oldest ? ` · since ${fmtCompactDate(oldest * 1000)}` : "";
+      const sinceLabel = oldest ? ` · outflows since ${fmtCompactDate(oldest * 1000)}` : "";
       statusEl.textContent =
-        `${rows.length} transfers scanned${sinceLabel}${unpriced ? " · some $TROLL rows await price" : ""} · updated ${new Date().toLocaleTimeString()}`;
+        `${rows.length} outflows scanned${sinceLabel}${unpriced ? " · some $TROLL rows await price" : ""} · updated ${new Date().toLocaleTimeString()}`;
 
       // Donut geometry: 240×240 viewBox, ring from r74 to r108, 12 o'clock start.
       const cx = 120, cy = 120, rOuter = 108, rInner = 74;
@@ -3197,8 +3215,8 @@ h1 {
       donutEl.innerHTML = `
         <svg viewBox="0 0 240 240" aria-hidden="false">
           ${paths}
-          <text class="money-flow-total" x="120" y="116" text-anchor="middle">$${fmtUsd(revenue)}</text>
-          <text class="money-flow-caption" x="120" y="136" text-anchor="middle">revenue in</text>
+          <text class="money-flow-total" x="120" y="116" text-anchor="middle">$${fmtUsd(total)}</text>
+          <text class="money-flow-caption" x="120" y="136" text-anchor="middle">total tracked</text>
         </svg>`;
 
       legendEl.innerHTML = slices.map((s) => `
