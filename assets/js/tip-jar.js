@@ -12,6 +12,10 @@
   // On-chain memo tag → the transaction log categorizes this as a tip.
   // Format: TR|<category>|<label>
   var TIP_MEMO  = 'TR|tip|Tip';
+  // Mirrors Meme Metro's revive-confirmation pattern: mobile has no injected
+  // wallet, so a tip is a Solana Pay deep-link handoff to Phantom. Without
+  // this, there was no coin-drop/thanks on return — just a silent no-op.
+  var TIP_PENDING_KEY = 'trollrunner_tip_pending';
 
   function $(id) { return document.getElementById(id); }
   function getCount() { return coinCount; }
@@ -142,14 +146,18 @@
       if (!window.confirm('Send ' + confirmLabel + ' to the Troll Fund treasury?\n\nThis is a real crypto payment.')) return;
 
       // Phone with no injected wallet → hand off to the Phantom app via Solana Pay.
-      // Don't commit the coin until the user returns; the transaction log will catch it.
+      // Don't commit the coin until the user returns; checkPendingMobileTip()
+      // polls the treasury for the new payment when the tab regains focus.
       if (window.TrollPay.shouldUseSolanaPay && window.TrollPay.shouldUseSolanaPay()) {
+        var payToken = window.TrollPay.getToken();
         statusEl.textContent = 'Opening Phantom…';
         try {
+          var sinceSig = window.TrollPay.latestTreasurySig ? await window.TrollPay.latestTreasurySig(payToken) : null;
           var payUrl = await window.TrollPay.solanaPayUrl({
-            amountUsd: selectedUsd, token: window.TrollPay.getToken(),
+            amountUsd: selectedUsd, token: payToken,
             label: 'Troll Fund tip', message: 'Tip the Troll Runner', memo: TIP_MEMO,
           });
+          sessionStorage.setItem(TIP_PENDING_KEY, JSON.stringify({ token: payToken, sinceSig: sinceSig, ts: Date.now() }));
           window.location.href = payUrl;   // launches the Phantom app to approve
         } catch (e) {
           statusEl.textContent = '⚠ ' + ((e && e.message) || 'Could not open Phantom');
@@ -184,9 +192,33 @@
       statusEl.innerHTML = '🪙 Thanks for the tip! <a href="' + url + '" target="_blank" rel="noopener">View receipt ↗</a>';
     });
 
+    var mobileConfirmRunning = false;
+    async function checkPendingMobileTip() {
+      var raw = sessionStorage.getItem(TIP_PENDING_KEY);
+      if (!raw || mobileConfirmRunning || !window.TrollPay.waitForNewTreasuryPayment) return;
+      var pending;
+      try { pending = JSON.parse(raw); } catch (e) { sessionStorage.removeItem(TIP_PENDING_KEY); return; }
+      mobileConfirmRunning = true;
+      statusEl.textContent = 'Confirming your payment…';
+      var result = await window.TrollPay.waitForNewTreasuryPayment(pending.token, pending.sinceSig, 70000, null);
+      mobileConfirmRunning = false;
+      sessionStorage.removeItem(TIP_PENDING_KEY);
+      if (result.ok) {
+        dropCoin();
+        var url = window.TrollPay.explorerUrl(result.sig);
+        statusEl.innerHTML = '🪙 Thanks for the tip! <a href="' + url + '" target="_blank" rel="noopener">View receipt ↗</a>';
+      } else {
+        statusEl.textContent = "Couldn't confirm the payment landed — check the transaction log if it went through.";
+      }
+    }
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) checkPendingMobileTip(); });
+    window.addEventListener('pageshow', checkPendingMobileTip);
+    window.addEventListener('focus', checkPendingMobileTip);
+
     setSelected(selectedUsd, false);
     renderPile();
     renderWalletStatus();
+    checkPendingMobileTip();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
