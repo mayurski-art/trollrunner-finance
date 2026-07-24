@@ -120,6 +120,18 @@ entries behind live as of 2026-07-23, so don't assume it was already
 current going in. Show the user the diff stat and ask before committing —
 don't commit/push without confirmation.
 
+## Timeline controls need no manual update
+
+The tag filter chips, month/year buttons, sort options, and the total-count
+stat on the finance page (`renderTimelineControls()` / `doom-total` in
+`index.html`) are all computed live from `financeTimelineItems` on every
+page load — new tags and months (e.g. a fresh `og-meme` tag or a new
+`july-2026` bucket) show up automatically once entries exist in Supabase.
+Nothing there needs editing. The only static, hand-maintained block near the
+timeline is `TROLL_DEATH_NOTES` (~line 1899 of `index.html`) — general
+methodology notes ("Chart source", "Timeline sourcing", "Why this exists"),
+unrelated to individual entries and out of scope for this skill.
+
 ## Things that went wrong once, don't repeat
 
 - Building the merge off the git JSON file instead of the live Supabase row
