@@ -23,6 +23,7 @@ if (window.location.hostname === 'trollrunner.net' || window.location.hostname =
 }
 * { box-sizing: border-box; }
 body {
+  position: relative;
   margin: 0;
   min-height: 100vh;
   font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
@@ -33,7 +34,20 @@ body {
     linear-gradient(180deg, #070b08, #030503 55%);
 }
 
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
 .wrap {
+  position: relative;
+  z-index: 1;
   max-width: 1040px;
   margin: 0 auto;
   padding: 26px 18px 56px;
@@ -97,9 +111,16 @@ body {
 
 h1 {
   margin: 0 0 6px;
-  font-size: 32px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.08;
+  background: linear-gradient(135deg, var(--text) 20%, var(--accent) 120%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  text-shadow: 0 0 34px rgba(126, 255, 142, 0.22);
 }
 
 .sub {
@@ -427,10 +448,16 @@ h1 {
 }
 
 .death-ledger-copy h2 {
-  margin: 0 0 8px;
-  font-size: 28px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  margin: 0 0 10px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+  background: linear-gradient(100deg, #ff9a8c 0%, var(--text) 35%, #bfe7ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 .death-ledger-copy p {
@@ -506,6 +533,13 @@ h1 {
   border-radius: 10px;
   border: 1px solid var(--line);
   background: rgba(7, 12, 8, 0.88);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.death-stat:hover {
+  transform: translateY(-2px);
+  border-color: rgba(126, 255, 142, 0.4);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
 }
 
 .death-stat-label {
@@ -540,6 +574,23 @@ h1 {
   border-radius: 12px;
   padding: 16px;
   background: rgba(7, 12, 8, 0.84);
+  transition: border-color 0.35s ease, background 0.35s ease, box-shadow 0.35s ease;
+}
+
+.death-panel.mode-fud {
+  border-color: rgba(255, 90, 70, 0.4);
+  background:
+    radial-gradient(circle at top right, rgba(255, 90, 70, 0.1), transparent 35%),
+    rgba(7, 12, 8, 0.84);
+  box-shadow: 0 0 0 1px rgba(255, 90, 70, 0.08) inset;
+}
+
+.death-panel.mode-guardian {
+  border-color: rgba(94, 176, 255, 0.4);
+  background:
+    radial-gradient(circle at top right, rgba(94, 176, 255, 0.12), transparent 35%),
+    rgba(7, 12, 8, 0.84);
+  box-shadow: 0 0 0 1px rgba(94, 176, 255, 0.08) inset;
 }
 
 .death-panel-header {
@@ -638,6 +689,25 @@ h1 {
   stroke-linecap: round;
   stroke-linejoin: round;
   filter: drop-shadow(0 0 10px rgba(126, 255, 142, 0.28));
+  transition: stroke 0.35s ease, filter 0.35s ease;
+}
+
+.mode-fud .chart-line {
+  stroke: #ff6a4d;
+  filter: drop-shadow(0 0 10px rgba(255, 90, 70, 0.4));
+}
+
+.mode-fud .chart-area-fill {
+  fill: rgba(255, 90, 70, 0.1);
+}
+
+.mode-guardian .chart-line {
+  stroke: #5eb0ff;
+  filter: drop-shadow(0 0 10px rgba(94, 176, 255, 0.4));
+}
+
+.mode-guardian .chart-area-fill {
+  fill: rgba(94, 176, 255, 0.1);
 }
 
 .chart-dot {
@@ -1000,13 +1070,28 @@ h1 {
   border: 1px solid rgba(126, 255, 142, 0.12);
   color: var(--text);
   font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
+.timeline-tag-guardian {
+  color: #bfe7ff;
+  background: rgba(94, 176, 255, 0.14);
+  border-color: rgba(94, 176, 255, 0.45);
+}
+
+.timeline-tag-fud {
+  color: #ff9a8c;
+  background: rgba(255, 90, 70, 0.14);
+  border-color: rgba(255, 90, 70, 0.45);
+}
+
 .timeline-card h4 {
   margin: 0 0 6px;
-  font-size: 15px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .timeline-card p {
@@ -3598,6 +3683,11 @@ h1 {
       document.getElementById("timeline-mode-all")?.classList.toggle("is-active", nextMode === "all");
       document.getElementById("timeline-mode-fud")?.classList.toggle("is-active", nextMode === "fud");
       document.getElementById("timeline-mode-guardian")?.classList.toggle("is-active", nextMode === "guardian");
+      [document.getElementById("death-timeline"), document.getElementById("death-chart")].forEach((panel) => {
+        if (!panel) return;
+        panel.classList.toggle("mode-fud", nextMode === "fud");
+        panel.classList.toggle("mode-guardian", nextMode === "guardian");
+      });
       const copyEl = document.getElementById("timeline-mode-copy");
       if (copyEl) {
         copyEl.textContent = nextMode === "guardian"
@@ -3749,7 +3839,7 @@ h1 {
           <article class="timeline-item">
             <div class="timeline-date">${escapeHtml(item.date)}</div>
             <div class="timeline-card">
-              <div class="timeline-tags">${item.tags.map((tag) => `<span class="timeline-tag">${escapeHtml(tag)}</span>`).join("")}</div>
+              <div class="timeline-tags">${item.tags.map((tag) => `<span class="timeline-tag timeline-tag-${item.kind === "guardian" ? "guardian" : "fud"}">${escapeHtml(tag)}</span>`).join("")}</div>
               <h4>${escapeHtml(item.title)}</h4>
               <p>${escapeHtml(item.copy)}</p>
               <div class="timeline-score">Receipt score: ${getItemScore(item).toLocaleString()}</div>
