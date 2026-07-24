@@ -48,50 +48,36 @@ body::before {
 .wrap {
   position: relative;
   z-index: 1;
-  max-width: 1040px;
+  max-width: 1520px;
   margin: 0 auto;
   padding: 26px 18px 56px;
 }
 
-.top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: linear-gradient(180deg, rgba(126, 255, 142, 0.06), rgba(126, 255, 142, 0.02));
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4) inset;
+.page-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  align-items: start;
+  gap: 20px;
 }
 
-.brand { letter-spacing: 0.04em; font-weight: 700; }
-
-.pills { display: flex; gap: 8px; flex-wrap: wrap; }
-.pill {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 8px 12px;
-  color: var(--text);
-  text-decoration: none;
-  font-size: 12px;
-  background: var(--panel-soft);
+.col-treasury,
+.col-trolldeaths {
+  min-width: 0;
+  container-type: inline-size;
 }
-.pill:hover { background: var(--accent-soft); }
 
-.text-view-note {
-  margin: 10px auto 0;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.35;
-  text-align: center;
-  text-shadow: 0 2px 10px rgba(0,0,0,0.55);
+.col-trolldeaths .death-ledger {
+  margin-top: 0;
+  height: 100%;
+}
+
+@media (max-width: 1180px) {
+  .page-columns { grid-template-columns: 1fr; }
+  .col-trolldeaths .death-ledger { margin-top: 14px; }
 }
 
 .hero {
-  margin-top: 20px;
+  margin-top: 0;
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 22px;
@@ -121,6 +107,45 @@ h1 {
   -webkit-text-fill-color: transparent;
   color: transparent;
   text-shadow: 0 0 34px rgba(126, 255, 142, 0.22);
+}
+
+.hero-title-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.hero-monopoly-wrap {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 2px;
+  animation: hero-monopoly-float 3.8s ease-in-out infinite;
+}
+
+.hero-monopoly {
+  position: relative;
+  display: block;
+  width: 54px;
+  aspect-ratio: 350 / 324;
+  background: url('https://trollrunner.net/assets/images/trollmonopoly-transparent-sprite.png') 0 0 / 3000% 100% no-repeat;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 10px rgba(126, 255, 142, 0.35));
+  animation: hero-monopoly-frames 1.35s steps(29, end) infinite;
+}
+
+@keyframes hero-monopoly-frames {
+  100% { background-position: 100% 0; }
+}
+
+@keyframes hero-monopoly-float {
+  0%, 100% { transform: translate(0, 0) rotate(-4deg); }
+  35% { transform: translate(-3px, -6px) rotate(4deg); }
+  68% { transform: translate(2px, -2px) rotate(-2deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-monopoly-wrap, .hero-monopoly { animation: none !important; }
 }
 
 .sub {
@@ -578,19 +603,37 @@ h1 {
 }
 
 .death-panel.mode-fud {
-  border-color: rgba(255, 90, 70, 0.4);
+  border-color: rgba(255, 90, 70, 0.6);
   background:
-    radial-gradient(circle at top right, rgba(255, 90, 70, 0.1), transparent 35%),
+    linear-gradient(165deg, rgba(255, 90, 70, 0.16), transparent 55%),
+    radial-gradient(circle at top right, rgba(255, 90, 70, 0.18), transparent 45%),
     rgba(7, 12, 8, 0.84);
-  box-shadow: 0 0 0 1px rgba(255, 90, 70, 0.08) inset;
+  box-shadow: 0 0 0 1px rgba(255, 90, 70, 0.18) inset, 0 0 30px rgba(255, 90, 70, 0.16), 0 0 0 3px rgba(255, 90, 70, 0.08);
+  animation: death-panel-pulse-fud 2.6s ease-in-out infinite;
 }
 
 .death-panel.mode-guardian {
-  border-color: rgba(94, 176, 255, 0.4);
+  border-color: rgba(94, 176, 255, 0.6);
   background:
-    radial-gradient(circle at top right, rgba(94, 176, 255, 0.12), transparent 35%),
+    linear-gradient(165deg, rgba(94, 176, 255, 0.16), transparent 55%),
+    radial-gradient(circle at top right, rgba(94, 176, 255, 0.2), transparent 45%),
     rgba(7, 12, 8, 0.84);
-  box-shadow: 0 0 0 1px rgba(94, 176, 255, 0.08) inset;
+  box-shadow: 0 0 0 1px rgba(94, 176, 255, 0.18) inset, 0 0 30px rgba(94, 176, 255, 0.16), 0 0 0 3px rgba(94, 176, 255, 0.08);
+  animation: death-panel-pulse-guardian 2.6s ease-in-out infinite;
+}
+
+@keyframes death-panel-pulse-fud {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255, 90, 70, 0.18) inset, 0 0 30px rgba(255, 90, 70, 0.16), 0 0 0 3px rgba(255, 90, 70, 0.08); }
+  50% { box-shadow: 0 0 0 1px rgba(255, 90, 70, 0.3) inset, 0 0 44px rgba(255, 90, 70, 0.26), 0 0 0 3px rgba(255, 90, 70, 0.14); }
+}
+
+@keyframes death-panel-pulse-guardian {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(94, 176, 255, 0.18) inset, 0 0 30px rgba(94, 176, 255, 0.16), 0 0 0 3px rgba(94, 176, 255, 0.08); }
+  50% { box-shadow: 0 0 0 1px rgba(94, 176, 255, 0.3) inset, 0 0 44px rgba(94, 176, 255, 0.26), 0 0 0 3px rgba(94, 176, 255, 0.14); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .death-panel.mode-fud, .death-panel.mode-guardian { animation: none !important; }
 }
 
 .death-panel-header {
@@ -1076,15 +1119,38 @@ h1 {
 }
 
 .timeline-tag-guardian {
-  color: #bfe7ff;
-  background: rgba(94, 176, 255, 0.14);
-  border-color: rgba(94, 176, 255, 0.45);
+  color: #dff1ff;
+  background: linear-gradient(135deg, rgba(94, 176, 255, 0.32), rgba(94, 176, 255, 0.12));
+  border-color: rgba(94, 176, 255, 0.65);
+  box-shadow: 0 0 12px rgba(94, 176, 255, 0.35);
 }
 
 .timeline-tag-fud {
-  color: #ff9a8c;
-  background: rgba(255, 90, 70, 0.14);
-  border-color: rgba(255, 90, 70, 0.45);
+  color: #ffe4de;
+  background: linear-gradient(135deg, rgba(255, 90, 70, 0.34), rgba(255, 90, 70, 0.12));
+  border-color: rgba(255, 90, 70, 0.65);
+  box-shadow: 0 0 12px rgba(255, 90, 70, 0.35);
+}
+
+.timeline-tag-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 15px;
+  border-radius: 999px;
+  margin-right: 2px;
+}
+
+.timeline-tag-icon-fud {
+  background: radial-gradient(circle, rgba(255, 90, 70, 0.3), transparent 70%);
+  filter: drop-shadow(0 0 6px rgba(255, 90, 70, 0.55));
+}
+
+.timeline-tag-icon-guardian {
+  background: radial-gradient(circle, rgba(94, 176, 255, 0.3), transparent 70%);
+  filter: drop-shadow(0 0 6px rgba(94, 176, 255, 0.55));
 }
 
 .timeline-card h4 {
@@ -1467,6 +1533,16 @@ h1 {
   }
 }
 
+@container (max-width: 700px) {
+  .hero-grid { grid-template-columns: 1fr; }
+  .finance-animation-card { max-width: 420px; margin: 0 auto; width: 100%; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@container (max-width: 420px) {
+  .stats { grid-template-columns: 1fr; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .finance-animation-credit {
     justify-content: center;
@@ -1692,19 +1768,15 @@ h1 {
 </head>
 <body>
   <div class="wrap">
-    <div class="top">
-      <strong class="brand">💰 TROLLRUNNER.FINANCE</strong>
-      <nav class="pills" aria-label="Section links">
-        <a class="pill" href="https://blog.trollrunner.net">Blog</a>
-        <a class="pill" href="https://trollrunner.net">Main Site</a>
-      </nav>
-    </div>
-    <div class="text-view-note">Recommended text view be 50% for mobile and 100% tablet devices</div>
-
+   <div class="page-columns">
+    <div class="col-treasury">
     <section class="hero">
       <div class="hero-grid">
         <div class="hero-copy">
-          <h1>Treasury Console</h1>
+          <div class="hero-title-row">
+            <h1>Treasury Console</h1>
+            <span class="hero-monopoly-wrap" aria-hidden="true"><span class="hero-monopoly"></span></span>
+          </div>
           <p class="sub" id="market-line">Loading market data...</p>
 
           <div class="stats">
@@ -1834,7 +1906,9 @@ h1 {
         (casino payouts, <code>TR|giveaway</code>) — every other outflow is marketing &amp; ops.
         USD values use current prices.</p>
     </section>
+    </div>
 
+    <div class="col-trolldeaths">
     <section class="death-ledger" aria-labelledby="trolldeaths-heading">
       <div class="death-ledger-top">
         <div class="death-ledger-copy">
@@ -1934,6 +2008,8 @@ h1 {
         </section>
       </div>
     </section>
+    </div>
+   </div>
 
     <section class="finance-admin-access" aria-label="Finance admin access">
       <div class="finance-admin-copy">
@@ -3839,7 +3915,7 @@ h1 {
           <article class="timeline-item">
             <div class="timeline-date">${escapeHtml(item.date)}</div>
             <div class="timeline-card">
-              <div class="timeline-tags">${item.tags.map((tag) => `<span class="timeline-tag timeline-tag-${item.kind === "guardian" ? "guardian" : "fud"}">${escapeHtml(tag)}</span>`).join("")}</div>
+              <div class="timeline-tags"><span class="timeline-tag-icon timeline-tag-icon-${item.kind === "guardian" ? "guardian" : "fud"}" aria-hidden="true">${item.kind === "guardian" ? "&#128519;" : "&#128128;"}</span>${item.tags.map((tag) => `<span class="timeline-tag timeline-tag-${item.kind === "guardian" ? "guardian" : "fud"}">${escapeHtml(tag)}</span>`).join("")}</div>
               <h4>${escapeHtml(item.title)}</h4>
               <p>${escapeHtml(item.copy)}</p>
               <div class="timeline-score">Receipt score: ${getItemScore(item).toLocaleString()}</div>
