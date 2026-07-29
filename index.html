@@ -2039,6 +2039,7 @@ h1 {
     const SOLANA_RPC_ENDPOINTS = [
       "https://solana-rpc.publicnode.com",
       "https://api.mainnet-beta.solana.com",
+      "https://rpc.ankr.com/solana",
     ];
     const MAX_TRANSFER_ITEMS = 12;
     const MAX_SIGNATURE_SCAN = 250;
@@ -4037,7 +4038,9 @@ h1 {
       }
       if (usdcResult.status === "rejected") {
         console.error("Unable to load USDC wallet balance", usdcResult.reason);
-        if (usdcEl) usdcEl.textContent = "Error fetching";
+        if (usdcEl && !(cached && typeof cached.usdcBalance === "number")) {
+          usdcEl.textContent = "Error fetching";
+        }
       }
     }
 
