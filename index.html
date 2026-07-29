@@ -705,58 +705,144 @@ h1 {
   min-height: 320px;
   padding: 18px 14px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(126, 255, 142, 0.12);
+  border: 1px solid rgba(126, 255, 142, 0.16);
   background:
-    linear-gradient(180deg, rgba(4, 7, 5, 0.96), rgba(10, 18, 11, 0.9));
+    radial-gradient(120% 140% at 50% 0%, rgba(126, 255, 142, 0.05), transparent 60%),
+    linear-gradient(180deg, rgba(4, 7, 5, 0.97), rgba(8, 16, 10, 0.94));
+  overflow: hidden;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.5);
+}
+
+.chart-aurora {
+  position: absolute;
+  width: 55%;
+  height: 65%;
+  border-radius: 50%;
+  filter: blur(48px);
+  opacity: 0.5;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  animation: aurora-drift 14s ease-in-out infinite alternate;
+}
+
+.chart-aurora-a {
+  top: -10%;
+  left: -8%;
+  background: radial-gradient(circle, rgba(126, 255, 142, 0.55), transparent 70%);
+}
+
+.chart-aurora-b {
+  bottom: -18%;
+  right: -6%;
+  background: radial-gradient(circle, rgba(94, 176, 255, 0.35), transparent 70%);
+  animation-duration: 18s;
+  animation-delay: -4s;
+}
+
+.mode-fud .chart-aurora-a { background: radial-gradient(circle, rgba(255, 106, 77, 0.55), transparent 70%); }
+.mode-fud .chart-aurora-b { background: radial-gradient(circle, rgba(255, 170, 60, 0.35), transparent 70%); }
+.mode-guardian .chart-aurora-a { background: radial-gradient(circle, rgba(94, 176, 255, 0.55), transparent 70%); }
+.mode-guardian .chart-aurora-b { background: radial-gradient(circle, rgba(191, 231, 255, 0.35), transparent 70%); }
+
+@keyframes aurora-drift {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(6%, 8%) scale(1.15); }
 }
 
 .doom-chart-grid {
+  position: relative;
   width: 100%;
   height: 250px;
   display: block;
 }
 
 .chart-grid-line {
-  stroke: rgba(126, 255, 142, 0.09);
+  stroke: rgba(126, 255, 142, 0.1);
   stroke-width: 1;
+  animation: grid-pulse 5s ease-in-out infinite;
+}
+
+@keyframes grid-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 
 .chart-area-fill {
-  fill: rgba(126, 255, 142, 0.12);
+  fill: url(#chartAreaDefault);
+  transition: fill 0.35s ease;
+}
+
+.chart-line-glow {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.45;
+  filter: blur(6px);
+  animation: line-breathe 3.4s ease-in-out infinite;
 }
 
 .chart-line {
   fill: none;
-  stroke: var(--accent);
+  stroke: url(#chartLineDefault);
   stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 10px rgba(126, 255, 142, 0.28));
-  transition: stroke 0.35s ease, filter 0.35s ease;
+  filter: drop-shadow(0 0 10px rgba(126, 255, 142, 0.55)) drop-shadow(0 0 22px rgba(126, 255, 142, 0.3));
+  transition: filter 0.35s ease;
 }
 
-.mode-fud .chart-line {
-  stroke: #ff6a4d;
-  filter: drop-shadow(0 0 10px rgba(255, 90, 70, 0.4));
+@keyframes line-breathe {
+  0%, 100% { opacity: 0.35; stroke-width: 9; }
+  50% { opacity: 0.6; stroke-width: 13; }
 }
 
-.mode-fud .chart-area-fill {
-  fill: rgba(255, 90, 70, 0.1);
+.mode-fud .chart-line { stroke: url(#chartLineFud); filter: drop-shadow(0 0 10px rgba(255, 90, 70, 0.6)) drop-shadow(0 0 22px rgba(255, 90, 70, 0.32)); }
+.mode-fud .chart-line-glow { stroke: #ff6a4d; }
+.mode-fud .chart-area-fill { fill: url(#chartAreaFud); }
+
+.mode-guardian .chart-line { stroke: url(#chartLineGuardian); filter: drop-shadow(0 0 10px rgba(94, 176, 255, 0.6)) drop-shadow(0 0 22px rgba(94, 176, 255, 0.32)); }
+.mode-guardian .chart-line-glow { stroke: #5eb0ff; }
+.mode-guardian .chart-area-fill { fill: url(#chartAreaGuardian); }
+
+.chart-spark {
+  fill: var(--accent);
+  opacity: 0.5;
 }
 
-.mode-guardian .chart-line {
-  stroke: #5eb0ff;
-  filter: drop-shadow(0 0 10px rgba(94, 176, 255, 0.4));
-}
+.mode-fud .chart-spark { fill: #ff6a4d; }
+.mode-guardian .chart-spark { fill: #5eb0ff; }
 
-.mode-guardian .chart-area-fill {
-  fill: rgba(94, 176, 255, 0.1);
-}
-
-.chart-dot {
+.chart-dot-core {
   fill: var(--accent);
   stroke: rgba(4, 7, 5, 0.9);
   stroke-width: 2;
+  filter: drop-shadow(0 0 8px rgba(126, 255, 142, 0.9));
+}
+
+.mode-fud .chart-dot-core { fill: #ff6a4d; filter: drop-shadow(0 0 8px rgba(255, 90, 70, 0.9)); }
+.mode-guardian .chart-dot-core { fill: #5eb0ff; filter: drop-shadow(0 0 8px rgba(94, 176, 255, 0.9)); }
+
+.chart-dot-pulse {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: dot-pulse 1.8s ease-out infinite;
+}
+
+.mode-fud .chart-dot-pulse { stroke: #ff6a4d; }
+.mode-guardian .chart-dot-pulse { stroke: #5eb0ff; }
+
+@keyframes dot-pulse {
+  0% { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-aurora, .chart-grid-line, .chart-line-glow, .chart-dot-pulse { animation: none !important; }
 }
 
 .chart-axis-label {
@@ -1969,6 +2055,8 @@ h1 {
               </div>
             </div>
             <div class="doom-chart-shell">
+              <div class="chart-aurora chart-aurora-a" aria-hidden="true"></div>
+              <div class="chart-aurora chart-aurora-b" aria-hidden="true"></div>
               <div id="doom-chart-grid" class="chart-empty">Loading line chart...</div>
               <div id="chart-events-layer" class="chart-events-layer"></div>
               <div id="chart-event-popover" class="chart-event-popover" hidden></div>
@@ -3497,6 +3585,23 @@ h1 {
       });
     }
 
+    function smoothPath(pts) {
+      if (pts.length < 3) return `M${pts.map((p) => p.join(",")).join(" L")}`;
+      let d = `M${pts[0][0].toFixed(2)},${pts[0][1].toFixed(2)}`;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[i === 0 ? 0 : i - 1];
+        const p1 = pts[i];
+        const p2 = pts[i + 1];
+        const p3 = pts[i + 2 < pts.length ? i + 2 : i + 1];
+        const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+        const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+        const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+        const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+        d += ` C${c1x.toFixed(2)},${c1y.toFixed(2)} ${c2x.toFixed(2)},${c2y.toFixed(2)} ${p2[0].toFixed(2)},${p2[1].toFixed(2)}`;
+      }
+      return d;
+    }
+
     function buildChartSvg(points) {
       const width = 920;
       const height = 250;
@@ -3509,8 +3614,9 @@ h1 {
       const chartHeight = height - padding.top - padding.bottom;
       const xFor = (index) => padding.left + (chartWidth * index) / Math.max(points.length - 1, 1);
       const yFor = (value) => padding.top + ((max - value) / span) * chartHeight;
-      const polyline = points.map((item, index) => `${xFor(index).toFixed(2)},${yFor(Number(item[1] || 0)).toFixed(2)}`).join(" ");
-      const areaPoints = `${padding.left},${height - padding.bottom} ${polyline} ${padding.left + chartWidth},${height - padding.bottom}`;
+      const pts = points.map((item, index) => [xFor(index), yFor(Number(item[1] || 0))]);
+      const linePath = smoothPath(pts);
+      const areaPath = `${linePath} L${(padding.left + chartWidth).toFixed(2)},${(height - padding.bottom).toFixed(2)} L${padding.left.toFixed(2)},${(height - padding.bottom).toFixed(2)} Z`;
       const gridLines = [0, 0.25, 0.5, 0.75, 1].map((step) => {
         const y = padding.top + chartHeight * step;
         return `<line class="chart-grid-line" x1="${padding.left}" y1="${y.toFixed(2)}" x2="${(padding.left + chartWidth).toFixed(2)}" y2="${y.toFixed(2)}"></line>`;
@@ -3519,14 +3625,54 @@ h1 {
       const last = points[points.length - 1];
       const lastX = xFor(points.length - 1);
       const lastY = yFor(Number(last[1] || 0));
+      const sparkCount = Math.min(6, pts.length - 1);
+      const sparks = [];
+      for (let i = 1; i <= sparkCount; i++) {
+        const p = pts[pts.length - 1 - i];
+        if (!p) break;
+        const t = 1 - i / (sparkCount + 1);
+        sparks.push(`<circle class="chart-spark" cx="${p[0].toFixed(2)}" cy="${p[1].toFixed(2)}" r="${(1.5 + t * 2.5).toFixed(2)}" opacity="${(t * 0.6).toFixed(2)}"></circle>`);
+      }
 
       return {
         svg: `
         <svg class="doom-chart-grid" viewBox="0 0 ${width} ${height}" role="img" aria-label="$TROLL price history line chart">
+          <defs>
+            <linearGradient id="chartLineDefault" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#3dffb0"></stop>
+              <stop offset="55%" stop-color="#7eff8e"></stop>
+              <stop offset="100%" stop-color="#c8ff8e"></stop>
+            </linearGradient>
+            <linearGradient id="chartLineFud" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#ffb347"></stop>
+              <stop offset="55%" stop-color="#ff6a4d"></stop>
+              <stop offset="100%" stop-color="#ff3d6a"></stop>
+            </linearGradient>
+            <linearGradient id="chartLineGuardian" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#bfe7ff"></stop>
+              <stop offset="55%" stop-color="#5eb0ff"></stop>
+              <stop offset="100%" stop-color="#7effe0"></stop>
+            </linearGradient>
+            <linearGradient id="chartAreaDefault" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="rgba(126,255,142,0.4)"></stop>
+              <stop offset="100%" stop-color="rgba(126,255,142,0)"></stop>
+            </linearGradient>
+            <linearGradient id="chartAreaFud" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="rgba(255,90,77,0.35)"></stop>
+              <stop offset="100%" stop-color="rgba(255,90,77,0)"></stop>
+            </linearGradient>
+            <linearGradient id="chartAreaGuardian" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="rgba(94,176,255,0.35)"></stop>
+              <stop offset="100%" stop-color="rgba(94,176,255,0)"></stop>
+            </linearGradient>
+          </defs>
           ${gridLines}
-          <polygon class="chart-area-fill" points="${areaPoints}"></polygon>
-          <polyline class="chart-line" points="${polyline}"></polyline>
-          <circle class="chart-dot" cx="${lastX.toFixed(2)}" cy="${lastY.toFixed(2)}" r="5"></circle>
+          <path class="chart-area-fill" d="${areaPath}"></path>
+          <path class="chart-line-glow" d="${linePath}"></path>
+          <path class="chart-line" d="${linePath}"></path>
+          ${sparks.join("")}
+          <circle class="chart-dot-pulse" cx="${lastX.toFixed(2)}" cy="${lastY.toFixed(2)}" r="5"></circle>
+          <circle class="chart-dot-core" cx="${lastX.toFixed(2)}" cy="${lastY.toFixed(2)}" r="5"></circle>
           <text class="chart-axis-label" x="${padding.left}" y="${height - 6}">${fmtCompactDate(first[0])}</text>
           <text class="chart-axis-label" x="${width - padding.right}" y="${height - 6}" text-anchor="end">${fmtCompactDate(last[0])}</text>
           <text class="chart-axis-label" x="${width - padding.right}" y="${padding.top + 10}" text-anchor="end">$${fmtPrice(max)}</text>
