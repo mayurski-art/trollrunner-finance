@@ -705,12 +705,12 @@ h1 {
   min-height: 320px;
   padding: 18px 14px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(126, 255, 142, 0.28);
+  border: 1px solid rgba(126, 255, 142, 0.16);
   background:
-    radial-gradient(140% 160% at 50% 0%, rgba(126, 255, 142, 0.1), transparent 60%),
+    radial-gradient(140% 160% at 50% 0%, rgba(126, 255, 142, 0.06), transparent 60%),
     linear-gradient(180deg, rgba(3, 6, 4, 0.97), rgba(6, 13, 8, 0.94));
   overflow: hidden;
-  box-shadow: 0 0 0 1px rgba(126, 255, 142, 0.06), 0 0 40px rgba(126, 255, 142, 0.1);
+  box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.45);
 }
 
 .doom-chart-shell::before {
@@ -718,57 +718,57 @@ h1 {
   position: absolute;
   inset: 0;
   background-image:
-    radial-gradient(1.5px 1.5px at 12% 22%, rgba(255, 255, 255, 0.9), transparent),
-    radial-gradient(1.5px 1.5px at 28% 68%, rgba(255, 255, 255, 0.7), transparent),
-    radial-gradient(1px 1px at 44% 12%, rgba(255, 255, 255, 0.8), transparent),
-    radial-gradient(1.5px 1.5px at 61% 54%, rgba(255, 255, 255, 0.6), transparent),
-    radial-gradient(1px 1px at 77% 30%, rgba(255, 255, 255, 0.85), transparent),
-    radial-gradient(1.5px 1.5px at 89% 75%, rgba(255, 255, 255, 0.6), transparent),
-    radial-gradient(1px 1px at 95% 15%, rgba(255, 255, 255, 0.7), transparent),
-    radial-gradient(1.5px 1.5px at 6% 85%, rgba(255, 255, 255, 0.55), transparent);
-  animation: star-twinkle 3.2s ease-in-out infinite;
+    radial-gradient(1.5px 1.5px at 12% 22%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 28% 68%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 44% 12%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1.5px 1.5px at 61% 54%, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1px 1px at 77% 30%, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(1.5px 1.5px at 89% 75%, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1px 1px at 95% 15%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1.5px 1.5px at 6% 85%, rgba(255, 255, 255, 0.28), transparent);
+  animation: star-twinkle 4.5s ease-in-out infinite;
   pointer-events: none;
 }
 
 @keyframes star-twinkle {
-  0%, 100% { opacity: 0.35; }
-  50% { opacity: 0.95; }
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
 }
 
 .chart-aurora {
   position: absolute;
-  width: 75%;
-  height: 90%;
+  width: 60%;
+  height: 70%;
   border-radius: 50%;
-  filter: blur(34px);
-  opacity: 0.85;
+  filter: blur(50px);
+  opacity: 0.4;
   pointer-events: none;
   mix-blend-mode: screen;
-  animation: aurora-drift 9s ease-in-out infinite alternate;
+  animation: aurora-drift 15s ease-in-out infinite alternate;
 }
 
 .chart-aurora-a {
-  top: -22%;
-  left: -18%;
-  background: radial-gradient(circle, rgba(126, 255, 142, 0.95), transparent 68%);
+  top: -14%;
+  left: -10%;
+  background: radial-gradient(circle, rgba(126, 255, 142, 0.6), transparent 70%);
 }
 
 .chart-aurora-b {
-  bottom: -28%;
-  right: -16%;
-  background: radial-gradient(circle, rgba(94, 176, 255, 0.75), transparent 68%);
-  animation-duration: 12s;
+  bottom: -20%;
+  right: -8%;
+  background: radial-gradient(circle, rgba(94, 176, 255, 0.4), transparent 70%);
+  animation-duration: 19s;
   animation-delay: -4s;
 }
 
-.mode-fud .chart-aurora-a { background: radial-gradient(circle, rgba(255, 106, 77, 0.95), transparent 68%); }
-.mode-fud .chart-aurora-b { background: radial-gradient(circle, rgba(255, 170, 60, 0.75), transparent 68%); }
-.mode-guardian .chart-aurora-a { background: radial-gradient(circle, rgba(94, 176, 255, 0.95), transparent 68%); }
-.mode-guardian .chart-aurora-b { background: radial-gradient(circle, rgba(191, 231, 255, 0.75), transparent 68%); }
+.mode-fud .chart-aurora-a { background: radial-gradient(circle, rgba(255, 106, 77, 0.6), transparent 70%); }
+.mode-fud .chart-aurora-b { background: radial-gradient(circle, rgba(255, 170, 60, 0.4), transparent 70%); }
+.mode-guardian .chart-aurora-a { background: radial-gradient(circle, rgba(94, 176, 255, 0.6), transparent 70%); }
+.mode-guardian .chart-aurora-b { background: radial-gradient(circle, rgba(191, 231, 255, 0.4), transparent 70%); }
 
 @keyframes aurora-drift {
   0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(10%, 12%) scale(1.35); }
+  100% { transform: translate(7%, 9%) scale(1.18); }
 }
 
 .doom-chart-grid {
@@ -779,14 +779,14 @@ h1 {
 }
 
 .chart-grid-line {
-  stroke: rgba(126, 255, 142, 0.22);
+  stroke: rgba(126, 255, 142, 0.12);
   stroke-width: 1;
-  animation: grid-pulse 3.2s ease-in-out infinite;
+  animation: grid-pulse 4.5s ease-in-out infinite;
 }
 
 @keyframes grid-pulse {
-  0%, 100% { opacity: 0.45; }
-  50% { opacity: 1; }
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.9; }
 }
 
 .chart-area-fill {
@@ -797,40 +797,40 @@ h1 {
 .chart-line-glow {
   fill: none;
   stroke: var(--accent);
-  stroke-width: 16;
+  stroke-width: 9;
   stroke-linecap: round;
   stroke-linejoin: round;
-  opacity: 0.55;
-  filter: blur(9px);
-  animation: line-breathe 2.4s ease-in-out infinite;
+  opacity: 0.35;
+  filter: blur(7px);
+  animation: line-breathe 3.2s ease-in-out infinite;
 }
 
 .chart-line {
   fill: none;
   stroke: url(#chartLineDefault);
-  stroke-width: 3.5;
+  stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 6px rgba(126, 255, 142, 0.9)) drop-shadow(0 0 18px rgba(126, 255, 142, 0.6)) drop-shadow(0 0 36px rgba(126, 255, 142, 0.35));
+  filter: drop-shadow(0 0 5px rgba(126, 255, 142, 0.6)) drop-shadow(0 0 12px rgba(126, 255, 142, 0.32));
   transition: filter 0.35s ease;
 }
 
 @keyframes line-breathe {
-  0%, 100% { opacity: 0.45; stroke-width: 14; }
-  50% { opacity: 0.85; stroke-width: 22; }
+  0%, 100% { opacity: 0.3; stroke-width: 8; }
+  50% { opacity: 0.5; stroke-width: 11; }
 }
 
-.mode-fud .chart-line { stroke: url(#chartLineFud); filter: drop-shadow(0 0 6px rgba(255, 90, 70, 0.9)) drop-shadow(0 0 18px rgba(255, 90, 70, 0.6)) drop-shadow(0 0 36px rgba(255, 90, 70, 0.35)); }
+.mode-fud .chart-line { stroke: url(#chartLineFud); filter: drop-shadow(0 0 5px rgba(255, 90, 70, 0.6)) drop-shadow(0 0 12px rgba(255, 90, 70, 0.32)); }
 .mode-fud .chart-line-glow { stroke: #ff6a4d; }
 .mode-fud .chart-area-fill { fill: url(#chartAreaFud); }
 
-.mode-guardian .chart-line { stroke: url(#chartLineGuardian); filter: drop-shadow(0 0 6px rgba(94, 176, 255, 0.9)) drop-shadow(0 0 18px rgba(94, 176, 255, 0.6)) drop-shadow(0 0 36px rgba(94, 176, 255, 0.35)); }
+.mode-guardian .chart-line { stroke: url(#chartLineGuardian); filter: drop-shadow(0 0 5px rgba(94, 176, 255, 0.6)) drop-shadow(0 0 12px rgba(94, 176, 255, 0.32)); }
 .mode-guardian .chart-line-glow { stroke: #5eb0ff; }
 .mode-guardian .chart-area-fill { fill: url(#chartAreaGuardian); }
 
 .chart-spark {
   fill: var(--accent);
-  filter: drop-shadow(0 0 4px currentColor);
+  filter: drop-shadow(0 0 2px currentColor);
 }
 
 .mode-fud .chart-spark { fill: #ff6a4d; }
@@ -840,43 +840,45 @@ h1 {
   fill: var(--accent);
   stroke: rgba(4, 7, 5, 0.9);
   stroke-width: 2;
-  filter: drop-shadow(0 0 6px rgba(126, 255, 142, 1)) drop-shadow(0 0 16px rgba(126, 255, 142, 0.8));
-  animation: dot-flare 1.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 5px rgba(126, 255, 142, 0.85));
+  animation: dot-flare 2.2s ease-in-out infinite;
 }
 
-.mode-fud .chart-dot-core { fill: #ff6a4d; filter: drop-shadow(0 0 6px rgba(255, 90, 70, 1)) drop-shadow(0 0 16px rgba(255, 90, 70, 0.8)); }
-.mode-guardian .chart-dot-core { fill: #5eb0ff; filter: drop-shadow(0 0 6px rgba(94, 176, 255, 1)) drop-shadow(0 0 16px rgba(94, 176, 255, 0.8)); }
+.mode-fud .chart-dot-core { fill: #ff6a4d; filter: drop-shadow(0 0 5px rgba(255, 90, 70, 0.85)); }
+.mode-guardian .chart-dot-core { fill: #5eb0ff; filter: drop-shadow(0 0 5px rgba(94, 176, 255, 0.85)); }
 
 @keyframes dot-flare {
   0%, 100% { r: 5; }
-  50% { r: 7; }
+  50% { r: 6; }
 }
 
 .chart-dot-pulse {
   fill: none;
   stroke: var(--accent);
-  stroke-width: 2.5;
+  stroke-width: 2;
+  opacity: 0.7;
   transform-box: fill-box;
   transform-origin: center;
-  animation: dot-pulse 1.6s ease-out infinite;
+  animation: dot-pulse 2s ease-out infinite;
 }
 
 .chart-dot-pulse-b {
   fill: none;
   stroke: var(--accent);
-  stroke-width: 2;
+  stroke-width: 1.5;
+  opacity: 0.7;
   transform-box: fill-box;
   transform-origin: center;
-  animation: dot-pulse 1.6s ease-out infinite;
-  animation-delay: 0.8s;
+  animation: dot-pulse 2s ease-out infinite;
+  animation-delay: 1s;
 }
 
 .mode-fud .chart-dot-pulse, .mode-fud .chart-dot-pulse-b { stroke: #ff6a4d; }
 .mode-guardian .chart-dot-pulse, .mode-guardian .chart-dot-pulse-b { stroke: #5eb0ff; }
 
 @keyframes dot-pulse {
-  0% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(4.5); opacity: 0; }
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(3.2); opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2162,10 +2164,13 @@ h1 {
     // and rate-limit-free (good for the many transaction-log calls) but goes down
     // intermittently; the Solana Foundation RPC is a solid fallback. Balance
     // fetches race them with Promise.any; the txn log tries them in order.
+    // Primary: our own proxy (assets/../../trollrunner-rpc-proxy Vercel project)
+    // fronting a Helius key server-side, so the key never ships to the browser.
+    // Falls back to public RPCs if the proxy is ever unreachable.
     const SOLANA_RPC_ENDPOINTS = [
+      "https://trollrunner-rpc-proxy.vercel.app/api/rpc",
       "https://solana-rpc.publicnode.com",
       "https://api.mainnet-beta.solana.com",
-      "https://rpc.ankr.com/solana",
     ];
     const MAX_TRANSFER_ITEMS = 12;
     const MAX_SIGNATURE_SCAN = 250;
@@ -3692,15 +3697,15 @@ h1 {
               <stop offset="100%" stop-color="#7effe0"></stop>
             </linearGradient>
             <linearGradient id="chartAreaDefault" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="rgba(126,255,142,0.65)"></stop>
+              <stop offset="0%" stop-color="rgba(126,255,142,0.32)"></stop>
               <stop offset="100%" stop-color="rgba(126,255,142,0)"></stop>
             </linearGradient>
             <linearGradient id="chartAreaFud" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="rgba(255,90,77,0.6)"></stop>
+              <stop offset="0%" stop-color="rgba(255,90,77,0.28)"></stop>
               <stop offset="100%" stop-color="rgba(255,90,77,0)"></stop>
             </linearGradient>
             <linearGradient id="chartAreaGuardian" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="rgba(94,176,255,0.6)"></stop>
+              <stop offset="0%" stop-color="rgba(94,176,255,0.28)"></stop>
               <stop offset="100%" stop-color="rgba(94,176,255,0)"></stop>
             </linearGradient>
           </defs>
