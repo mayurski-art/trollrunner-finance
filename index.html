@@ -549,7 +549,7 @@ h1 {
 .death-summary {
   margin-top: 16px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1018,31 +1018,6 @@ h1 {
   margin-top: 6px;
   color: var(--text);
   font-size: 16px;
-}
-
-.chart-notes {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.chart-note {
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(126, 255, 142, 0.14);
-  background: rgba(126, 255, 142, 0.05);
-}
-
-.chart-note strong {
-  display: block;
-  margin-bottom: 5px;
-  font-size: 13px;
-}
-
-.chart-note span {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .timeline-list {
@@ -1647,14 +1622,13 @@ h1 {
 
 @media (max-width: 860px) {
   .hero-grid { grid-template-columns: 1fr; }
-  .stats, .grid, .death-summary, .chart-notes, .chart-meta { grid-template-columns: 1fr; }
+  .stats, .grid, .death-summary, .chart-meta { grid-template-columns: 1fr; }
   .timeline-item { grid-template-columns: 1fr; gap: 8px; }
   h1 { font-size: 28px; }
   .death-ledger-copy h2 { font-size: 24px; }
   .finance-admin-pass { width: 100%; }
   .chart-events-layer,
-  .chart-event-popover,
-  .chart-notes {
+  .chart-event-popover {
     display: none !important;
   }
 }
@@ -2068,11 +2042,6 @@ h1 {
           <div class="death-stat-value" id="doom-latest">Loading</div>
           <div class="death-stat-copy">The newest talking point currently making the rounds.</div>
         </article>
-        <article class="death-stat">
-          <div class="death-stat-label">Mood</div>
-          <div class="death-stat-value">Still Trolling</div>
-          <div class="death-stat-copy">When the timeline gets noisy, the response is documentation instead of panic.</div>
-        </article>
       </div>
 
       <div class="death-sections">
@@ -2102,7 +2071,6 @@ h1 {
               <div id="chart-event-popover" class="chart-event-popover" hidden></div>
             </div>
             <div id="chart-meta" class="chart-meta"></div>
-            <div id="chart-notes" class="chart-notes"></div>
           </div>
         </section>
 
@@ -2189,20 +2157,6 @@ h1 {
     const CACHE_TTL_MS = 2 * 60 * 1000;
     const STALE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
     const DEFAULT_CHART_RANGE = "365";
-    const TROLL_DEATH_NOTES = [
-      {
-        title: "Chart source",
-        copy: "Price history is fetched from CoinGecko's token-by-contract market chart endpoint for the Solana mint you provided.",
-      },
-      {
-        title: "Timeline sourcing",
-        copy: "The entries below are based on publicly indexed X/Twitter mirrors and public snippets I could verify without logging into X.",
-      },
-      {
-        title: "Why this exists",
-        copy: "The point is to preserve the doom calls next to the market curve, so the receipts stay attached to the chart.",
-      },
-    ];
     const TROLL_FUD_TIMELINE = [
       {
         kind: "fud",
@@ -4083,7 +4037,6 @@ h1 {
       const latestTheme = activeItems[0]?.title || sortTimelineItems(financeTimelineItems)[0]?.title || "Monitoring";
       const totalEl = document.getElementById("doom-total");
       const latestEl = document.getElementById("doom-latest");
-      const chartNotesEl = document.getElementById("chart-notes");
       const timelineEl = document.getElementById("timeline-list");
 
       if (totalEl) totalEl.textContent = financeTimelineItems.length.toString();
@@ -4091,15 +4044,6 @@ h1 {
       renderTimelineControls();
       const currentChartPrice = Number(latestChartPoints[latestChartPoints.length - 1]?.[1] || latestTrollUsd || 0);
       renderDeathRollup(currentChartPrice);
-
-      if (chartNotesEl) {
-        chartNotesEl.innerHTML = TROLL_DEATH_NOTES.map((item) => `
-          <article class="chart-note">
-            <strong>${escapeHtml(item.title)}</strong>
-            <span>${escapeHtml(item.copy)}</span>
-          </article>
-        `).join("");
-      }
 
       if (timelineEl) {
         timelineEl.innerHTML = activeItems.length ? activeItems.map((item) => `
@@ -4193,7 +4137,7 @@ h1 {
         latestTrollUsd = priceResult.value.trollUsd;
         const usdValue = balanceResult.value.amount * priceResult.value.trollUsd;
         usdEl.textContent = `$${fmtUsd(usdValue)}`;
-        marketLineEl.textContent = `${priceResult.value.source} live: $TROLL $${fmtPrice(priceResult.value.trollUsd)} | Wallet via ${new URL(balanceResult.value.endpoint).hostname}`;
+        marketLineEl.textContent = `${priceResult.value.source} live: $TROLL $${fmtPrice(priceResult.value.trollUsd)}`;
         writeStatsCache({
           balance: balanceResult.value.amount,
           usdcBalance: hasUsdc ? usdcResult.value.amount : (cached?.usdcBalance || 0),
