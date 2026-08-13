@@ -11,6 +11,13 @@ if (window.location.hostname === 'trollrunner.net' || window.location.hostname =
 }
 </script>
 <style>
+/* Native cross-document page transitions. Only fires between same-origin
+   documents, so this stays inert until the site is served through the
+   front door at trollrunner.net/finance. Mobile only by design. */
+@media (max-width: 760px) {
+  @view-transition { navigation: auto; }
+}
+
 :root {
   --bg: #050806;
   --panel: #0b140d;
